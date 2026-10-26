@@ -1,0 +1,16 @@
+<div class="pokeball-watermark"></div>
+
+<!-- Pokémon flotantes de fondo -->
+<div class="floating-container">
+  <img *ngFor="let poke of floatingPokemons" 
+       [src]="poke.imageUrl" 
+       class="floating-pokemon"
+       [class.left-to-right]="poke.direction === 'left-to-right'"
+       [class.right-to-left]="poke.direction === 'right-to-left'"
+       [style.top]="poke.top"
+       [style.width]="poke.size"
+       [style.animation-duration]="poke.duration"
+       alt="Fondo Pokemon">
+</div>
+
+<router-outlet></router-outlet>

@@ -1,0 +1,231 @@
+/* IMPORT RETRO PIXEL FONTS */
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
+
+:root {
+  /* RETRO COLOR PALETTE - 8-BIT STADIUM CONSOLE */
+  --bg-primary: #1b4d3e; /* Retro Grass Green */
+  --bg-secondary: #ffcb05; /* Pikachu Yellow */
+  --bg-tertiary: #ffffff;
+  
+  --accent-primary: #ffcb05; /* Pokémon Yellow */
+  --accent-secondary: #3b82f6; /* Pokémon Blue */
+  --accent-success: #16a34a; /* Grass Green */
+  --accent-danger: #dc2626; /* Pokeball Red */
+  --accent-warning: #ea580c; /* Fire Orange */
+  --accent-info: #0284c7; /* Ice Blue */
+  
+  --text-primary: #ffffff;
+  --text-secondary: #e2e8f0;
+  --text-muted: #ffcb05;
+  
+  --border-glass: #000000; /* Solid Black borders for 8-bit retro look */
+  --bg-glass: #181d26; /* Game Screen Dark Gray */
+  --shadow-premium: 5px 5px 0 #000000;
+  --shadow-glow: 0 0 0 #000000; /* No blur glows in retro games! */
+
+  /* TYPE COLORS */
+  --type-normal: #a8a77a;
+  --type-fire: #ee8130;
+  --type-water: #6390f0;
+  --type-electric: #f7d02c;
+  --type-grass: #7ac74c;
+  --type-ice: #96d9d6;
+  --type-fighting: #c22e28;
+  --type-poison: #a33ea1;
+  --type-ground: #e2bf65;
+  --type-flying: #a98ff3;
+  --type-psychic: #f95587;
+  --type-bug: #a6b91a;
+  --type-rock: #b6a136;
+  --type-ghost: #735797;
+  --type-dragon: #6f35fc;
+  --type-steel: #b7b7ce;
+  --type-fairy: #d685ad;
+  
+  --transition-fast: 0.1s ease;
+  --transition-medium: 0.2s ease;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'VT323', monospace;
+  font-size: 1.5rem;
+  background-color: var(--bg-primary);
+  /* Retro Grid Pattern for the Grass Field */
+  background-image: 
+    linear-gradient(rgba(0, 0, 0, 0.15) 2px, transparent 2px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.15) 2px, transparent 2px);
+  background-size: 40px 40px;
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+  line-height: 1.2;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Press Start 2P', monospace;
+  font-weight: normal;
+  text-transform: uppercase;
+  color: #ffcb05; /* Pikachu Yellow titles */
+  text-shadow: 3px 3px 0 #000000;
+  letter-spacing: normal;
+}
+
+/* SCROLLBAR STYLING */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #000000;
+}
+::-webkit-scrollbar-thumb {
+  background: #ffcb05;
+  border: 2px solid #000000;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #ffffff;
+}
+
+/* RETRO CONSOLE PANEL CLASS */
+.glass {
+  background: #1e293b;
+  border: 4.5px solid #000000 !important;
+  border-radius: 8px !important;
+  box-shadow: 6px 6px 0 #000000 !important;
+  position: relative;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.glass::before {
+  display: none !important; /* Hide modern yellow stripe */
+}
+
+/* BUTTONS - 8-BIT RETRO PRESS STYLE */
+.btn-primary {
+  background: #ffcb05; /* Retro Gold Yellow */
+  color: #000000;
+  border: 4.5px solid #000000;
+  padding: 10px 20px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.65rem;
+  font-weight: normal;
+  border-radius: 6px;
+  cursor: pointer;
+  box-shadow: 4px 4px 0 #000000;
+  transition: all var(--transition-fast);
+  text-transform: uppercase;
+}
+
+.btn-primary:hover:not([disabled]) {
+  background: #ffe066;
+}
+
+.btn-primary:active:not([disabled]) {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 #000000;
+}
+
+.btn-primary:disabled {
+  background: #475569 !important;
+  color: #94a3b8 !important;
+  border-color: #000000 !important;
+  box-shadow: none !important;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+.btn-secondary {
+  background: #dc2626; /* Retro Pokeball Red */
+  color: #ffffff;
+  border: 4.5px solid #000000;
+  padding: 10px 20px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.65rem;
+  font-weight: normal;
+  border-radius: 6px;
+  cursor: pointer;
+  box-shadow: 4px 4px 0 #000000;
+  transition: all var(--transition-fast);
+  text-transform: uppercase;
+}
+
+.btn-secondary:hover:not([disabled]) {
+  background: #ef4444;
+}
+
+.btn-secondary:active:not([disabled]) {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 #000000;
+}
+
+/* INPUTS */
+.input-control {
+  width: 100%;
+  background: #000000;
+  border: 3.5px solid #ffffff;
+  border-radius: 4px;
+  padding: 12px;
+  color: #ffffff;
+  font-family: monospace;
+  font-size: 1rem;
+}
+
+.input-control:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+/* ALERT MESSAGES */
+.alert {
+  padding: 10px;
+  border: 3.5px solid #000000;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  font-family: 'VT323', monospace;
+  font-size: 1.4rem;
+  box-shadow: 3px 3px 0 #000000;
+}
+.alert-danger {
+  background: #fca5a5;
+  color: #7f1d1d;
+}
+.alert-success {
+  background: #86efac;
+  color: #064e3b;
+}
+
+/* HOLO GLOW RETRO */
+.holo-glow {
+  position: relative;
+  overflow: hidden;
+}
+
+.holo-glow::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    115deg,
+    transparent 40%,
+    rgba(255, 255, 255, 0.15) 50%,
+    transparent 60%
+  );
+  transform: rotate(15deg);
+  pointer-events: none;
+  animation: shine 4s infinite linear;
+}
+
+@keyframes shine {
+  0% { left: -100%; }
+  100% { left: 100%; }
+}

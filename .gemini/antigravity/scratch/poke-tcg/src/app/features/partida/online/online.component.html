@@ -1,0 +1,224 @@
+<div class="game-page">
+  <!-- NO ACTIVE DECK STATE -->
+  <div class="no-deck-state" *ngIf="noActiveDeck">
+    <div class="glass state-box">
+      <h2>¡FALTA MAZO ACTIVO!</h2>
+      <p class="text-secondary">
+        Para jugar en línea necesitas tener un mazo activo con **mínimo 20 y máximo 30 cartas**.
+      </p>
+      <button class="btn-primary" routerLink="/mis-mazos">IR A GESTIONAR MAZOS</button>
+    </div>
+  </div>
+
+  <!-- LOBBY SCREEN (Not in room yet) -->
+  <div class="lobby-screen" *ngIf="!noActiveDeck && !enSala">
+    <div class="lobby-card glass">
+      <h2>COMBATE EN LÍNEA</h2>
+      <p class="subtitle text-secondary">Desafía a otros entrenadores en tiempo real</p>
+
+      <div class="alert alert-danger" *ngIf="errorMessage">
+        {{ errorMessage }}
+      </div>
+
+      <div class="lobby-actions">
+        <!-- CREATE ROOM -->
+        <div class="lobby-option">
+          <h3>CREAR NUEVA SALA</h3>
+          <p class="text-secondary">Genera un código único para invitar a un amigo.</p>
+          <button class="btn-primary lobby-btn" [disabled]="loading" (click)="crearSala()">
+            {{ loading ? 'CREANDO...' : 'CREAR SALA' }}
+          </button>
+        </div>
+
+        <div class="option-divider">
+          <span>O</span>
+        </div>
+
+        <!-- JOIN ROOM -->
+        <div class="lobby-option">
+          <h3>UNIRSE A UNA SALA</h3>
+          <p class="text-secondary">Introduce el código de sala proporcionado por tu rival.</p>
+          <input type="text" class="input-control code-input" placeholder="Código de 6 letras" [(ngModel)]="codigoJoin" maxlength="6" />
+          <button class="btn-secondary lobby-btn" [disabled]="loading || !codigoJoin.trim()" (click)="unirseASala()">
+            {{ loading ? 'UNIÉNDOSE...' : 'UNIRSE A SALA' }}
+          </button>
+        </div>
+      </div>
+
+      <button class="btn-secondary back-btn" routerLink="/menu">VOLVER AL MENÚ</button>
+    </div>
+  </div>
+
+  <!-- WAITING FOR PLAYERS (LOBBY WAIT) -->
+  <div class="waiting-screen" *ngIf="enSala && gameState()?.estado === 'esperando_jugadores'">
+    <div class="glass wait-box">
+      <h2>SALA CREADA CON ÉXITO</h2>
+      <p class="text-secondary">Comparte este código con tu oponente para iniciar la partida:</p>
+      
+      <div class="code-box">
+        <strong>{{ codigoSala }}</strong>
+      </div>
+
+      <div class="loader-container">
+        <div class="loader-glow"></div>
+        <p>Esperando que tu oponente se conecte...</p>
+      </div>
+
+      <button class="btn-logout" (click)="salir()">CANCELAR SALA</button>
+    </div>
+  </div>
+
+  <!-- GAME INTERFACE -->
+  <div class="game-interface" *ngIf="enSala && gameState()?.estado !== 'esperando_jugadores' && gameState()">
+    <!-- GAME HEADER BAR -->
+    <div class="game-header-bar glass">
+      <div class="game-title-info">
+        <h3>PARTIDA ONLINE (CÓDIGO: {{ codigoSala }})</h3>
+        <span class="turn-indicator" [class.my-turn]="esMiTurno">
+          {{ esMiTurno ? 'TU TURNO (FASE PRINCIPAL / ATAQUE)' : 'TURNO DEL RIVAL...' }}
+        </span>
+      </div>
+
+      <div class="header-actions">
+        <button class="btn-logout" *ngIf="gameState()?.estado === 'en_curso'" (click)="rendirse()">RENDIRSE</button>
+        <button class="btn-primary" *ngIf="gameState()?.estado === 'finalizada'" (click)="salir()">VOLVER AL MENÚ</button>
+      </div>
+    </div>
+
+    <!-- MAIN GAME LAYOUT -->
+    <div class="game-body-layout">
+      <!-- PLAYMAT (TAPETE) -->
+      <div class="playmat-wrapper">
+        <app-tapete 
+          [playerName]="mio?.username || 'Tú'"
+          [rivalName]="rival?.username || 'Oponente'"
+          [playerDeckCount]="mio?.mazo?.length || 0"
+          [playerDiscardCount]="mio?.descarte?.length || 0"
+          [playerDiscardTopUrl]="getTopDiscardUrl(mio?.descarte)"
+          [rivalDeckCount]="rival?.mazo?.length || 0"
+          [rivalDiscardCount]="rival?.descarte?.length || 0"
+          [rivalDiscardTopUrl]="getTopDiscardUrl(rival?.descarte)">
+
+          <!-- RIVAL FIELD (PROJECTION) -->
+          <ng-container rival-field>
+            <div class="field-slot" *ngFor="let slot of rival?.campo; let idx = index" 
+                 [class.has-card]="slot !== null"
+                 [class.target-glow]="cartaAtacanteIndex !== null"
+                 (click)="declararObjetivoAtaque(idx)">
+              <app-carta-card 
+                *ngIf="slot" 
+                [carta]="slot.carta" 
+                [hpActual]="slot.hp_actual"
+                [estadoEfecto]="slot.estado_efecto"
+                [inGame]="true"
+                [interactivo]="false"
+                [esRival]="true">
+              </app-carta-card>
+              <div class="empty-slot-text" *ngIf="!slot">RIVAL SLOT {{ idx + 1 }}</div>
+            </div>
+          </ng-container>
+
+          <!-- PLAYER FIELD (PROJECTION) -->
+          <ng-container player-field>
+            <div class="field-slot" *ngFor="let slot of mio?.campo; let idx = index"
+                 [class.has-card]="slot !== null"
+                 [class.attacker-selected]="cartaAtacanteIndex === idx">
+              <app-carta-card 
+                *ngIf="slot" 
+                [carta]="slot.carta" 
+                [hpActual]="slot.hp_actual"
+                [puedeAtacar]="slot.puede_atacar"
+                [habilidadUsada]="slot.habilidad_usada"
+                [estadoEfecto]="slot.estado_efecto"
+                [inGame]="true"
+                (cardClick)="seleccionarAtacante(idx)"
+                (useAbilityClick)="usarHabilidad(idx)">
+              </app-carta-card>
+              <div class="empty-slot-text" *ngIf="!slot">TU SLOT {{ idx + 1 }}</div>
+            </div>
+          </ng-container>
+        </app-tapete>
+      </div>
+
+      <!-- SIDE PANEL (LOGS & DECK INFO) -->
+      <div class="side-panel glass">
+        <!-- LOGS -->
+        <div class="panel-section logs-section">
+          <h4>LOGS DE BATALLA</h4>
+          <div class="logs-container">
+            <p *ngFor="let log of logs" class="log-entry">{{ log }}</p>
+          </div>
+        </div>
+
+        <!-- STATS & ACTIONS -->
+        <div class="panel-section actions-section">
+          <div class="pile-stats">
+            <h4>ESTADÍSTICAS</h4>
+            <div class="stat-row">
+              <span>Daño Causado:</span>
+              <strong style="color: #ef4444">{{ myStats.danioTotal }} HP</strong>
+            </div>
+            <div class="stat-row">
+              <span>Curación Total:</span>
+              <strong style="color: #3b82f6">{{ myStats.curacionTotal }} HP</strong>
+            </div>
+            <div class="stat-row">
+              <span>Rivales Eliminados:</span>
+              <strong>{{ myStats.pokemonEliminados }}</strong>
+            </div>
+            <div class="stat-row">
+              <span>Turnos Jugados:</span>
+              <strong>{{ myStats.turnosJugados }}</strong>
+            </div>
+            <hr style="border-color: #333; margin: 8px 0;">
+            <div class="stat-row">
+              <span>Tu Mazo:</span>
+              <strong>{{ mio?.mazo?.length }} cartas</strong>
+            </div>
+            <div class="stat-row">
+              <span>Tu Descarte:</span>
+              <strong>{{ mio?.descarte?.length }} cartas</strong>
+            </div>
+            <div class="stat-row">
+              <span>Mazo Rival:</span>
+              <strong>{{ rival?.mazo?.length }} cartas</strong>
+            </div>
+          </div>
+
+          <button class="btn-primary end-turn-btn" 
+                  [disabled]="!esMiTurno" 
+                  (click)="finalizarTurno()">
+            FINALIZAR TURNO
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PLAYER HAND -->
+    <div class="player-hand-panel glass">
+      <h4>TU MANO ({{ mio?.mano?.length }}/7)</h4>
+      <div class="hand-row">
+        <div class="hand-card-wrapper" *ngFor="let card of mio?.mano; let idx = index">
+          <app-carta-card 
+            [carta]="card.carta" 
+            (cardClick)="invocar(idx)">
+          </app-carta-card>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GAME OVER OVERLAY -->
+  <div class="overlay-gameover" *ngIf="gameState()?.estado === 'finalizada' || gameState()?.estado === 'abandonada'">
+    <div class="gameover-content glass">
+      <h2>¡PARTIDA FINALIZADA!</h2>
+      <p class="winner-text" [style.color]="gameState()?.ganador_id === userId ? 'var(--accent-success)' : 'var(--accent-danger)'">
+        {{ gameState()?.ganador_id === userId ? '¡HAS GANADO LA PARTIDA!' : 'TU RIVAL HA GANADO LA PARTIDA...' }}
+      </p>
+      
+
+
+      <button class="btn-primary" (click)="salir()">VOLVER AL PANEL</button>
+    </div>
+  </div>
+</div>

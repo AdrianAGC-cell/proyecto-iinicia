@@ -1,0 +1,41 @@
+.floating-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 0; /* Detrás de casi todo pero encima del fondo base */
+  overflow: hidden;
+}
+
+.floating-pokemon {
+  position: absolute;
+  opacity: 0.15; /* Sutil y en el fondo */
+  filter: grayscale(30%) blur(1px); /* Para que no distraiga y parezca de fondo */
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+.left-to-right {
+  left: -200px;
+  animation-name: floatRight;
+  transform: scaleX(-1); /* Si quieres que miren a la derecha (opcional, la mayoría mira a la izquierda por defecto) */
+}
+
+.right-to-left {
+  right: -200px;
+  animation-name: floatLeft;
+}
+
+@keyframes floatRight {
+  0% { transform: translateX(0) scaleX(-1) translateY(0); }
+  50% { transform: translateX(60vw) scaleX(-1) translateY(-20px); }
+  100% { transform: translateX(120vw) scaleX(-1) translateY(20px); }
+}
+
+@keyframes floatLeft {
+  0% { transform: translateX(0) translateY(0); }
+  50% { transform: translateX(-60vw) translateY(20px); }
+  100% { transform: translateX(-120vw) translateY(-20px); }
+}

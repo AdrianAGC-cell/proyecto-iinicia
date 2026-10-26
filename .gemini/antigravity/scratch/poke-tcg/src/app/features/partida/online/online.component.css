@@ -1,0 +1,385 @@
+.game-page {
+  width: 100vw;
+  min-height: 100vh;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  overflow-x: hidden;
+}
+
+/* NO ACTIVE DECK */
+.no-deck-state {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 80vh;
+}
+
+.state-box {
+  padding: 40px;
+  text-align: center;
+  max-width: 500px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  align-items: center;
+}
+
+/* LOBBY PANELS */
+.lobby-screen, .waiting-screen {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 80vh;
+}
+
+.lobby-card {
+  max-width: 700px;
+  width: 100%;
+  padding: 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.lobby-card h2, .wait-box h2 {
+  font-size: 2.2rem;
+  text-align: center;
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.lobby-card .subtitle {
+  text-align: center;
+  font-size: 0.95rem;
+  margin-top: -12px;
+}
+
+.lobby-actions {
+  display: grid;
+  grid-template-columns: 1fr 50px 1fr;
+  align-items: center;
+  gap: 24px;
+  margin-top: 16px;
+}
+
+@media (max-width: 768px) {
+  .lobby-actions {
+    grid-template-columns: 1fr;
+  }
+  .option-divider {
+    height: 30px;
+  }
+}
+
+.lobby-option {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.lobby-option h3 {
+  font-size: 1.1rem;
+  color: var(--accent-primary);
+}
+
+.lobby-option p {
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.option-divider {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--text-muted);
+}
+
+.code-input {
+  text-align: center;
+  letter-spacing: 0.15em;
+  font-weight: 700;
+}
+
+.lobby-btn {
+  width: 100%;
+  padding: 10px;
+}
+
+.back-btn {
+  width: 100%;
+  margin-top: 10px;
+}
+
+/* WAITING ROOM */
+.wait-box {
+  padding: 48px;
+  max-width: 500px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 20px;
+}
+
+.code-box {
+  background: rgba(0,0,0,0.3);
+  border: 1px solid var(--border-glass);
+  padding: 16px 32px;
+  border-radius: 12px;
+  margin: 10px 0;
+  box-shadow: var(--shadow-glow);
+}
+
+.code-box strong {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 2.5rem;
+  letter-spacing: 0.1em;
+  color: var(--accent-secondary);
+}
+
+.loader-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.loader-glow {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 3px solid rgba(255,255,255,0.05);
+  border-top-color: var(--accent-primary);
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* GAME INTERFACE COPIED STYLES FOR REUSE */
+.game-interface {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+}
+
+.game-header-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  border-radius: 12px;
+}
+
+.game-title-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.turn-indicator {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.turn-indicator.my-turn {
+  color: var(--accent-success);
+}
+
+.game-body-layout {
+  display: grid;
+  grid-template-columns: 3.5fr 1.5fr;
+  gap: 20px;
+}
+
+@media (max-width: 992px) {
+  .game-body-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.playmat-wrapper {
+  width: 100%;
+}
+
+/* FIELD SLOTS */
+.field-slot {
+  aspect-ratio: 2 / 3;
+  width: 100%;
+  border: 2px dashed rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: var(--transition-fast);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.empty-slot-text {
+  font-size: 0.55rem;
+  font-weight: 800;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+  text-align: center;
+}
+
+.field-slot.has-card {
+  border: none;
+  background: transparent;
+}
+
+/* COMBAT HIGHLIGHTS */
+.field-slot.attacker-selected {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 15px rgba(99, 102, 241, 0.4);
+}
+
+.field-slot.target-glow:hover {
+  cursor: pointer;
+  border-color: var(--accent-danger);
+  box-shadow: 0 0 15px rgba(239, 68, 68, 0.4);
+}
+
+/* SIDE PANEL */
+.side-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 20px;
+  border-radius: 16px;
+  height: 100%;
+}
+
+.panel-section h4 {
+  font-size: 0.85rem;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-glass);
+  padding-bottom: 6px;
+  margin-bottom: 12px;
+}
+
+.logs-container {
+  height: 250px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 6px;
+}
+
+.log-entry {
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--text-secondary);
+  border-left: 2px solid var(--border-glass);
+  padding-left: 8px;
+}
+
+.pile-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+}
+
+.stat-row span {
+  color: var(--text-secondary);
+}
+
+.end-turn-btn {
+  width: 100%;
+}
+
+/* PLAYER HAND PANEL */
+.player-hand-panel {
+  padding: 16px 24px;
+  border-radius: 16px;
+}
+
+.player-hand-panel h4 {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+  margin-bottom: 12px;
+}
+
+.hand-row {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  min-height: 180px;
+}
+
+.hand-card-wrapper {
+  flex-shrink: 0;
+  width: 110px;
+}
+
+::ng-deep .hand-card-wrapper app-carta-card .card-container {
+  max-width: 100% !important;
+}
+
+/* OVERLAY GAMEOVER */
+.overlay-gameover {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.9);
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.gameover-content {
+  max-width: 450px;
+  width: 100%;
+  padding: 40px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  align-items: center;
+  border-radius: 20px;
+}
+
+.winner-text {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  font-size: 1.5rem;
+}
+
+.points-reward-box {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border-glass);
+  border-radius: 8px;
+  padding: 12px 24px;
+  margin-bottom: 10px;
+}
+
+.points-reward-box span {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}

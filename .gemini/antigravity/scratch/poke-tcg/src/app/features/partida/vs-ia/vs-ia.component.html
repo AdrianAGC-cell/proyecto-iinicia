@@ -1,0 +1,177 @@
+<div class="game-page">
+  <!-- ESTADO DE CARGA -->
+  <div class="loading-state" *ngIf="loading">
+    <div class="loader-glow"></div>
+    <h3>PREPARANDO EL CAMPO DE BATALLA...</h3>
+  </div>
+
+  <!-- INTERFAZ DE JUEGO -->
+  <div class="game-interface" *ngIf="!loading && gameState()">
+    <!-- BARRA SUPERIOR -->
+    <div class="game-header-bar glass">
+      <div class="game-title-info">
+        <h3>PARTIDA VS IA</h3>
+        <span class="turn-indicator" [class.my-turn]="esMiTurno">
+          {{ esMiTurno ? '⚔️ TU TURNO - SELECCIONA OBJETIVO Y ATACA' : '🤖 TURNO DE LA IA...' }}
+        </span>
+      </div>
+
+      <div class="header-actions">
+        <button class="btn-logout" *ngIf="gameState()?.estado === 'en_curso'" (click)="rendirse()">RENDIRSE</button>
+        <button class="btn-primary" *ngIf="gameState()?.estado === 'finalizada'" (click)="salir()">VOLVER AL MENÚ</button>
+      </div>
+    </div>
+
+    <!-- INSTRUCCIONES DE SELECCIÓN -->
+    <div class="selection-hint glass" *ngIf="esMiTurno">
+      <span *ngIf="cartaAtacanteIndex === null && objetivoSeleccionadoIdx === null">
+        👆 Haz clic en un Pokémon rival para seleccionarlo como OBJETIVO, luego haz clic en tu Pokémon para ATACAR.
+      </span>
+      <span *ngIf="objetivoSeleccionadoIdx !== null && cartaAtacanteIndex === null" class="text-warning">
+        🎯 ¡Objetivo seleccionado! Ahora haz clic en tu Pokémon para atacar.
+      </span>
+      <span *ngIf="cartaAtacanteIndex !== null && objetivoSeleccionadoIdx === null" class="text-success">
+        ⚔️ ¡Atacante listo! Ahora haz clic en un Pokémon rival como objetivo.
+      </span>
+    </div>
+
+    <!-- DISEÑO PRINCIPAL -->
+    <div class="game-body-layout">
+      <!-- TAPETE -->
+      <div class="playmat-wrapper">
+        <app-tapete 
+          [tapeteUrl]="tapeteUrl"
+          [playerName]="gameState()?.jugador1?.username || 'Tú'"
+          [rivalName]="gameState()?.jugador2?.username || 'Inteligencia Artificial'"
+          [playerDeckCount]="gameState()?.jugador1?.mazo?.length || 0"
+          [playerDiscardCount]="gameState()?.jugador1?.descarte?.length || 0"
+          [playerDiscardTopUrl]="getTopDiscardUrl(gameState()?.jugador1?.descarte)"
+          [rivalDeckCount]="gameState()?.jugador2?.mazo?.length || 0"
+          [rivalDiscardCount]="gameState()?.jugador2?.descarte?.length || 0"
+          [rivalDiscardTopUrl]="getTopDiscardUrl(gameState()?.jugador2?.descarte)">
+
+          <!-- CAMPO RIVAL -->
+          <ng-container rival-field>
+            <div class="field-slot" *ngFor="let slot of gameState()?.jugador2?.campo; let idx = index" 
+                 [class.has-card]="slot !== null"
+                 [class.target-glow]="esMiTurno && slot !== null"
+                 [class.target-active]="objetivoSeleccionadoIdx === idx"
+                 (click)="seleccionarObjetivoRival(idx)">
+              <app-carta-card 
+                *ngIf="slot" 
+                [carta]="slot.carta" 
+                [hpActual]="slot.hp_actual"
+                [estadoEfecto]="slot.estado_efecto"
+                [inGame]="true"
+                [interactivo]="true"
+                [esRival]="true"
+                [targetSelected]="objetivoSeleccionadoIdx === idx">
+              </app-carta-card>
+              <div class="empty-slot-text" *ngIf="!slot">SLOT {{ idx + 1 }}</div>
+            </div>
+          </ng-container>
+
+          <!-- CAMPO JUGADOR -->
+          <ng-container player-field>
+            <div class="field-slot" *ngFor="let slot of gameState()?.jugador1?.campo; let idx = index"
+                 [class.has-card]="slot !== null"
+                 [class.attacker-selected]="cartaAtacanteIndex === idx">
+              <app-carta-card 
+                *ngIf="slot" 
+                [carta]="slot.carta" 
+                [hpActual]="slot.hp_actual"
+                [puedeAtacar]="slot.puede_atacar"
+                [habilidadUsada]="slot.habilidad_usada"
+                [estadoEfecto]="slot.estado_efecto"
+                [acciones_restantes]="slot.acciones_restantes"
+                [inGame]="true"
+                [seleccionado]="cartaAtacanteIndex === idx"
+                (cardClick)="seleccionarAtacante(idx)"
+                (useAbilityClick)="usarHabilidad(idx)">
+              </app-carta-card>
+              <div class="empty-slot-text" *ngIf="!slot">SLOT {{ idx + 1 }}</div>
+            </div>
+          </ng-container>
+        </app-tapete>
+      </div>
+
+      <!-- PANEL LATERAL -->
+      <div class="side-panel glass">
+        <div class="panel-section logs-section">
+          <h4>LOGS DE BATALLA</h4>
+          <div class="logs-container">
+            <p *ngFor="let log of logs" class="log-entry">{{ log }}</p>
+          </div>
+        </div>
+
+        <div class="panel-section actions-section">
+          <div class="pile-stats">
+            <h4>ESTADÍSTICAS</h4>
+            <div class="stat-row">
+              <span>Daño Causado:</span>
+              <strong style="color: #ef4444">{{ gameLogic.stats().jugador1.danioTotal }} HP</strong>
+            </div>
+            <div class="stat-row">
+              <span>Curación Total:</span>
+              <strong style="color: #3b82f6">{{ gameLogic.stats().jugador1.curacionTotal }} HP</strong>
+            </div>
+            <div class="stat-row">
+              <span>Rivales Eliminados:</span>
+              <strong>{{ gameLogic.stats().jugador1.pokemonEliminados }}</strong>
+            </div>
+            <div class="stat-row">
+              <span>Turnos Jugados:</span>
+              <strong>{{ gameLogic.stats().jugador1.turnosJugados }}</strong>
+            </div>
+            <hr style="border-color: #333; margin: 8px 0;">
+            <div class="stat-row">
+              <span>Tu Mazo:</span>
+              <strong>{{ gameState()?.jugador1?.mazo?.length }} cartas</strong>
+            </div>
+            <div class="stat-row">
+              <span>Tu Descarte:</span>
+              <strong>{{ gameState()?.jugador1?.descarte?.length }} cartas</strong>
+            </div>
+            <div class="stat-row">
+              <span>Mazo IA:</span>
+              <strong>{{ gameState()?.jugador2?.mazo?.length }} cartas</strong>
+            </div>
+          </div>
+
+          <button class="btn-primary end-turn-btn" 
+                  [disabled]="!esMiTurno" 
+                  (click)="finalizarTurno()">
+            FINALIZAR TURNO
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MANO DEL JUGADOR -->
+    <div class="player-hand-panel glass">
+      <h4>TU MANO ({{ gameState()?.jugador1?.mano?.length }}/7)</h4>
+      <div class="hand-row">
+        <div class="hand-card-wrapper" *ngFor="let card of gameState()?.jugador1?.mano; let idx = index">
+          <app-carta-card 
+            [carta]="card.carta" 
+            (cardClick)="invocar(idx)">
+          </app-carta-card>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL GAME OVER -->
+  <div class="overlay-gameover" *ngIf="gameState()?.estado === 'finalizada' || gameState()?.estado === 'abandonada'">
+    <div class="gameover-content glass">
+      <h2>¡PARTIDA FINALIZADA!</h2>
+      <p class="winner-text" [style.color]="gameState()?.ganador_id === supabaseService.currentUser()?.id ? '#22c55e' : '#ef4444'">
+        {{ gameState()?.ganador_id === supabaseService.currentUser()?.id ? '🏆 ¡HAS GANADO LA PARTIDA!' : '💀 LA IA HA GANADO...' }}
+      </p>
+      
+      <button class="btn-primary" (click)="iniciarPartidaIA()">REVANCHA</button>
+      <button class="btn-secondary" (click)="salir()">VOLVER AL MENÚ</button>
+    </div>
+  </div>
+
+</div>

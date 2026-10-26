@@ -1,0 +1,109 @@
+<div class="card-container" 
+     [class.selected]="seleccionado" 
+     [class.can-attack]="inGame && puedeAtacar"
+     [class.interactivo]="interactivo"
+     [class.reverso]="esReverso"
+     [class.especial-card]="esEspecial()"
+     [class.target-selected]="targetSelected"
+     [ngClass]="getRarezaClass()"
+     (click)="onClick()">
+
+  <!-- REVERSO DE LA CARTA (FUNDA) -->
+  <ng-container *ngIf="esReverso; else frontTemplate">
+    <div class="card-back" [style.backgroundImage]="reversoUrl ? 'url(' + reversoUrl + ')' : ''">
+      <div class="back-inner" *ngIf="!reversoUrl">
+        <div class="pokeball-glow"></div>
+        <span class="back-title">POKÉMON</span>
+        <span class="back-subtitle">CARD GAME</span>
+      </div>
+    </div>
+  </ng-container>
+
+  <!-- ANVERSO DE LA CARTA (DATOS POKÉMON) -->
+  <ng-template #frontTemplate>
+    <div class="card-front" *ngIf="carta">
+      <!-- Encabezado: Nombre y Tipo / HP -->
+      <div class="card-header">
+        <span class="card-name">{{ carta.nombre }}</span>
+        <div class="card-hp-badge" *ngIf="!esRival || inGame" [style.backgroundColor]="getTypeColor()">
+          <span>HP</span>
+          <strong>{{ inGame ? hpActual : carta.puntos_vida }}</strong>
+        </div>
+      </div>
+
+      <!-- BARRA DE VIDA INDIVIDUAL (solo en juego) -->
+      <div class="hp-bar-container" *ngIf="inGame">
+        <div class="hp-bar-track">
+          <div class="hp-bar-fill" 
+               [style.width]="getHpPercent() + '%'"
+               [style.background]="getHpColor()">
+          </div>
+        </div>
+        <span class="hp-text">{{ hpActual }}/{{ carta.puntos_vida }}</span>
+      </div>
+
+      <!-- Puntos de Acción (PA) si está en juego -->
+      <div class="action-points-bar" *ngIf="inGame && !esRival">
+        <span class="pa-label">PA:</span>
+        <div class="pa-dots-container">
+          <span class="pa-dot" *ngFor="let act of accionesRestantesArray()" [class.filled]="act"></span>
+        </div>
+      </div>
+
+      <!-- Imagen -->
+      <div class="card-image-box" [style.borderColor]="getTypeColor()">
+        <img [src]="carta.imagen_url" [alt]="carta.nombre" class="pokemon-image" loading="lazy" />
+        <span class="type-pill" [style.backgroundColor]="getTypeColor()">
+          {{ carta.tipo_principal | uppercase }}
+        </span>
+      </div>
+
+      <!-- Detalles Ocultos para el Rival -->
+      <ng-container *ngIf="!esRival">
+        <!-- Estadísticas de Combate -->
+        <div class="stats-grid">
+          <div class="stat-item">
+            <span class="stat-label">ATK</span>
+            <span class="stat-value text-atk">{{ carta.puntos_ataque }}</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">DEF</span>
+            <span class="stat-value text-def">{{ carta.puntos_defensa }}</span>
+          </div>
+        </div>
+
+        <!-- Habilidad Especial -->
+        <div class="ability-box" *ngIf="carta.habilidad_especial">
+          <div class="ability-title">
+            <span>HABILIDAD</span>
+            <button class="btn-ability-use" 
+                    *ngIf="inGame && !habilidadUsada"
+                    (click)="onAbilityClick($event)">
+              USAR
+            </button>
+            <span class="ability-used-badge" *ngIf="inGame && habilidadUsada">USADA</span>
+          </div>
+          <p class="ability-desc">{{ carta.habilidad_especial }}</p>
+        </div>
+
+        <!-- Efectos de Estado Activos -->
+        <div class="status-effects-bar" *ngIf="inGame && estadoEfecto">
+          <span class="status-badge" [ngClass]="'status-' + estadoEfecto">
+            {{ estadoEfecto | uppercase }}
+          </span>
+        </div>
+
+        <!-- Copias en Colección -->
+        <div class="copies-badge" *ngIf="cantidad !== undefined && cantidad > 0">
+          x{{ cantidad }}
+        </div>
+
+        <!-- Footer: Rareza -->
+        <div class="card-footer">
+          <span class="rarity-text">{{ carta.nivel_rareza }}</span>
+          <span class="id-text">#{{ carta.pokemon_id }}</span>
+        </div>
+      </ng-container>
+    </div>
+  </ng-template>
+</div>
