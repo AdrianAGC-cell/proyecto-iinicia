@@ -89,7 +89,6 @@ fun DashboardScreen(
                     currentRole = currentRole,
                     onRoleSelected = { role ->
                         currentRole = role
-                        authViewModel.loginDemo(role)
                         dashboardViewModel.loadData()
                     }
                 )
@@ -265,7 +264,7 @@ fun DashboardScreen(
                             .padding(20.dp)
                     ) {
                         Text(
-                            text = "Panel Académico • ${user.role}",
+                            text = "Panel Académico • $currentRole",
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
                             color = CyanAccent

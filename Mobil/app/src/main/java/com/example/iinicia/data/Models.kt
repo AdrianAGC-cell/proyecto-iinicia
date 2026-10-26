@@ -14,7 +14,7 @@ data class UserDto(
     val id: String,
     val name: String,
     val email: String,
-    val role: String, // Estudiante, Profesor, Administrativo
+    val role: String, // Estudiante, Aspirante, Coordinador, Admin TI
     val moodleId: String
 )
 
@@ -43,4 +43,16 @@ data class NotificationDto(
     val message: String,
     val timestamp: String,
     val type: String // academic, sso, alert
+)
+
+data class SupabaseLoginRequest(
+    val email: String,
+    val password: String
+)
+
+data class SupabaseAuthResponse(
+    val access_token: String,
+    val refresh_token: String?,
+    val error: String?,
+    val error_description: String?
 )

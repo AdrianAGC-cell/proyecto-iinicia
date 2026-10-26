@@ -5,7 +5,6 @@ import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NamedNavArgument
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -42,7 +41,6 @@ fun IiniciaNavGraph() {
         composable("dashboard") {
             val localContext = LocalContext.current
             DashboardScreen(
-
                 dashboardViewModel = dashboardViewModel,
                 authViewModel = authViewModel,
                 onCourseClick = { courseId ->
@@ -96,16 +94,4 @@ fun IiniciaNavGraph() {
             )
         }
     }
-}
-
-private fun NavGraphBuilder.composable(
-    route: String,
-    arguments: List<NamedNavArgument>,
-    content: Any
-) {
-    TODO("Not yet implemented")
-}
-
-private fun NavGraphBuilder.composable(route: String, content: () -> Unit) {
-    TODO("Not yet implemented")
 }

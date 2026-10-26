@@ -1,5 +1,6 @@
 package com.example.iinicia.ui.screens
 
+import android.util.Patterns
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -15,14 +16,11 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -33,6 +31,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.iinicia.R
@@ -41,20 +40,23 @@ import com.example.iinicia.ui.theme.CyanAccent
 import com.example.iinicia.ui.theme.CyanBright
 import com.example.iinicia.ui.theme.DarkBackground
 import com.example.iinicia.ui.theme.TextMuted
+import com.example.iinicia.viewmodel.AuthState
 import com.example.iinicia.viewmodel.AuthViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(
     authViewModel: AuthViewModel,
     onLoginSuccess: () -> Unit
 ) {
-    var email by remember { mutableStateOf("ramos.gordo@iinicia.org") }
-    var password by remember { mutableStateOf("••••••••") }
-    var selectedRole by remember { mutableStateOf("Estudiante") }
-    var expanded by remember { mutableStateOf(false) }
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    val roles = listOf("Estudiante", "Aspirante", "Coordinador", "Admin TI")
+    val authState by authViewModel.authState.collectAsState()
+
+    if (authState is AuthState.Success) {
+        onLoginSuccess()
+    }
 
     Box(
         modifier = Modifier
@@ -75,9 +77,9 @@ fun LoginScreen(
                     .padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Institutional Logo
+                // Institutional Logo (White variant for dark background)
                 Image(
-                    painter = painterResource(id = R.drawable.logo_iinicia),
+                    painter = painterResource(id = R.drawable.logo_iinicia_white),
                     contentDescription = "Logo IINICIA",
                     modifier = Modifier.size(56.dp)
                 )
@@ -95,49 +97,18 @@ fun LoginScreen(
                     text = "Instituto de Innovación y Ciencias Aplicadas",
                     fontSize = 12.sp,
                     color = TextMuted,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    textAlign = TextAlign.Center
                 )
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Role Selector Dropdown
-                ExposedDropdownMenuBox(
-                    expanded = expanded,
-                    onExpandedChange = { expanded = !expanded },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    OutlinedTextField(
-                        value = selectedRole,
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Rol Institucional", color = TextMuted) },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor()
-                    )
-                    ExposedDropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = { expanded = false }
-                    ) {
-                        roles.forEach { role ->
-                            DropdownMenuItem(
-                                text = { Text(role) },
-                                onClick = {
-                                    selectedRole = role
-                                    expanded = false
-                                }
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
                 OutlinedTextField(
                     value = email,
-                    onValueChange = { email = it },
-                    label = { Text("Correo Institucional", color = TextMuted) },
+                    onValueChange = { 
+                        email = it
+                        errorMessage = null
+                    },
+                    label = { Text("Correo electrónico (Gmail o institucional)", color = TextMuted) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
@@ -146,20 +117,40 @@ fun LoginScreen(
 
                 OutlinedTextField(
                     value = password,
-                    onValueChange = { password = it },
+                    onValueChange = { 
+                        password = it
+                        errorMessage = null
+                    },
                     label = { Text("Contraseña", color = TextMuted) },
                     visualTransformation = PasswordVisualTransformation(),
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
 
+                if (errorMessage != null || authState is AuthState.Error) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = errorMessage ?: (authState as? AuthState.Error)?.message ?: "",
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(24.dp))
 
                 // Login Button
                 Button(
                     onClick = {
-                        authViewModel.login(email, password, selectedRole)
-                        onLoginSuccess()
+                        if (email.isBlank() || !Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+                            errorMessage = "Ingrese un correo válido (ej. usuario@gmail.com o institucional)."
+                            return@Button
+                        }
+                        if (password.length < 6) {
+                            errorMessage = "La contraseña debe tener al menos 6 caracteres."
+                            return@Button
+                        }
+                        authViewModel.login(email, password)
                     },
                     modifier = Modifier
                         .fillMaxWidth()
@@ -167,23 +158,12 @@ fun LoginScreen(
                     colors = ButtonDefaults.buttonColors(containerColor = CyanBright),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text("Iniciar Sesión Institucional", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Direct Demo Login Button
-                OutlinedButton(
-                    onClick = {
-                        authViewModel.loginDemo(selectedRole)
-                        onLoginSuccess()
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text("Probar como Estudiante Demo (Ramos Gordo)", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = CyanAccent)
+                    Text(
+                        text = if (authState is AuthState.Loading) "Autenticando..." else "Iniciar Sesión en Supabase",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
                 }
             }
         }

@@ -22,54 +22,35 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _authState = MutableStateFlow<AuthState>(
         try {
-            AuthState.Success(repository.demoUser)
+            val token = repository.getTokenManager().getToken()
+            if (!token.isNullOrEmpty() && !token.startsWith("demo_")) {
+                val role = repository.getTokenManager().getUserRole()
+                AuthState.Success(
+                    UserDto(
+                        id = "user_session",
+                        name = "Usuario IINICIA",
+                        email = "usuario@iinicia.org",
+                        role = role,
+                        moodleId = "MOODLE-USER-01"
+                    )
+                )
+            } else {
+                AuthState.Idle
+            }
         } catch (_: Exception) {
             AuthState.Idle
         }
     )
     val authState: StateFlow<AuthState> = _authState.asStateFlow()
 
-    fun login(email: String, pass: String, role: String) {
+    fun login(email: String, pass: String) {
         viewModelScope.launch {
             _authState.value = AuthState.Loading
-            try {
-                val result = repository.login(email, pass, role)
-                result.onSuccess { response ->
-                    _authState.value = AuthState.Success(response.user)
-                }.onFailure { err ->
-                    _authState.value = AuthState.Error(err.localizedMessage ?: "Error de autenticación")
-                }
-            } catch (_: Exception) {
-                _authState.value = AuthState.Success(repository.demoUser.copy(role = role))
-            }
-        }
-    }
-
-    fun loginDemo(role: String = "Estudiante") {
-        viewModelScope.launch {
-            _authState.value = AuthState.Loading
-            try {
-                val result = repository.loginDemo(role)
-                result.onSuccess { response ->
-                    _authState.value = AuthState.Success(response.user)
-                }.onFailure {
-                    _authState.value = AuthState.Success(repository.demoUser.copy(role = role))
-                }
-            } catch (_: Exception) {
-                _authState.value = AuthState.Success(repository.demoUser.copy(role = role))
-            }
-        }
-    }
-
-    fun switchRole(role: String) {
-        viewModelScope.launch {
-            try {
-                val result = repository.loginDemo(role)
-                result.onSuccess { response ->
-                    _authState.value = AuthState.Success(response.user)
-                }
-            } catch (_: Exception) {
-                _authState.value = AuthState.Success(repository.demoUser.copy(role = role))
+            val result = repository.login(email, pass)
+            result.onSuccess { response ->
+                _authState.value = AuthState.Success(response.user)
+            }.onFailure { err ->
+                _authState.value = AuthState.Error(err.localizedMessage ?: "Error al iniciar sesión con Supabase.")
             }
         }
     }

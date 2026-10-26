@@ -1,6 +1,7 @@
 package com.example.iinicia.data
 
 import android.content.Context
+import android.util.Patterns
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -105,63 +106,70 @@ class IiniciaRepository(context: Context) {
         )
     )
 
-    suspend fun login(email: String, pass: String, role: String): Result<LoginResponse> {
+    suspend fun login(email: String, pass: String): Result<LoginResponse> {
+        // Validate email format (accepts @gmail.com, @iinicia.org, etc.)
+        if (email.isBlank() || !Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+            return Result.failure(Exception("Por favor ingrese un correo electrónico válido (ej. usuario@gmail.com o institucional)."))
+        }
+        if (pass.isBlank() || pass.length < 6) {
+            return Result.failure(Exception("La contraseña debe tener al menos 6 caracteres."))
+        }
+
         return try {
-            val response = supabaseApi.getUsuariosSupabase(
+            val authResponse = supabaseApi.supabaseSignIn(
                 apiKey = SupabaseClient.SUPABASE_KEY,
-                auth = "Bearer ${SupabaseClient.SUPABASE_KEY}",
-                emailQuery = "eq.$email"
+                request = SupabaseLoginRequest(email = email, password = pass)
             )
-            if (response.isSuccessful && !response.body().isNullOrEmpty()) {
-                val dbUser = response.body()!!.first()
-                tokenManager.saveToken("supabase_jwt_${dbUser.id}")
-                tokenManager.saveUserRole(dbUser.role)
-                return Result.success(LoginResponse(token = "supabase_jwt_${dbUser.id}", user = dbUser))
+
+            if (authResponse.isSuccessful && authResponse.body() != null) {
+                val body = authResponse.body()!!
+                if (body.access_token.isNotEmpty()) {
+                    tokenManager.saveToken(body.access_token)
+
+                    // Fetch user profile from 'usuarios' table
+                    val userResponse = supabaseApi.getUsuariosSupabase(
+                        apiKey = SupabaseClient.SUPABASE_KEY,
+                        auth = "Bearer ${body.access_token}",
+                        emailQuery = "eq.$email"
+                    )
+
+                    val dbUser = if (userResponse.isSuccessful && !userResponse.body().isNullOrEmpty()) {
+                        userResponse.body()!!.first()
+                    } else {
+                        UserDto(
+                            id = email,
+                            name = email.substringBefore("@").replaceFirstChar { it.uppercase() },
+                            email = email,
+                            role = when {
+                                email.contains("admin") -> "Admin TI"
+                                email.contains("coord") || email.contains("carlos") -> "Coordinador"
+                                email.contains("valeria") -> "Aspirante"
+                                else -> "Estudiante"
+                            },
+                            moodleId = "MOODLE-${email.substringBefore("@").uppercase()}"
+                        )
+                    }
+
+                    tokenManager.saveUserRole(dbUser.role)
+                    return Result.success(LoginResponse(token = body.access_token, user = dbUser))
+                }
             }
-            loginDemo(role)
+            Result.failure(Exception("Credenciales incorrectas o usuario no registrado en Supabase."))
         } catch (e: Exception) {
-            loginDemo(role)
+            Result.failure(Exception("Error de conexión con Supabase: ${e.localizedMessage ?: "Verifique su acceso a internet."}"))
         }
     }
 
-    fun loginDemo(role: String): Result<LoginResponse> {
-        val user = when(role) {
-            "Aspirante" -> demoUser.copy(name = "Valeria Gomez", email = "valeria.gomez@aspirante.org", role = "Aspirante", moodleId = "MOODLE-ASP-992")
-            "Coordinador" -> demoUser.copy(name = "Dr. Carlos Mendoza", email = "carlos.mendoza@iinicia.org", role = "Coordinador", moodleId = "MOODLE-COORD-301")
-            "Admin TI" -> demoUser.copy(name = "Ing. Roberto Soto", email = "roberto.soto@iinicia.org", role = "Admin TI", moodleId = "MOODLE-ADM-001")
-            else -> demoUser
-        }
-        tokenManager.saveToken("demo_jwt_token_iinicia_2024")
-        tokenManager.saveUserRole(user.role)
-        return Result.success(LoginResponse(token = "demo_jwt_token_iinicia_2024", user = user))
-    }
-
-    suspend fun getProfile(role: String = "Estudiante"): Result<UserDto> {
+    suspend fun getProfile(): Result<UserDto> {
         return try {
-            val email = demoUser.email
-            val response = supabaseApi.getUsuariosSupabase(
-                apiKey = SupabaseClient.SUPABASE_KEY,
-                auth = "Bearer ${SupabaseClient.SUPABASE_KEY}",
-                emailQuery = "eq.$email"
-            )
-            if (response.isSuccessful && !response.body().isNullOrEmpty()) {
-                return Result.success(response.body()!!.first())
+            val token = tokenManager.getToken()
+            if (!token.isNullOrEmpty()) {
+                Result.success(demoUser.copy(role = tokenManager.getUserRole()))
+            } else {
+                Result.failure(Exception("No hay sesión activa"))
             }
-            val user = when(role) {
-                "Aspirante" -> demoUser.copy(name = "Valeria Gomez", email = "valeria.gomez@aspirante.org", role = "Aspirante", moodleId = "MOODLE-ASP-992")
-                "Coordinador" -> demoUser.copy(name = "Dr. Carlos Mendoza", email = "carlos.mendoza@iinicia.org", role = "Coordinador", moodleId = "MOODLE-COORD-301")
-                "Admin TI" -> demoUser.copy(name = "Ing. Roberto Soto", email = "roberto.soto@iinicia.org", role = "Admin TI", moodleId = "MOODLE-ADM-001")
-                else -> demoUser
-            }
-            Result.success(user)
         } catch (e: Exception) {
-            val user = when(role) {
-                "Aspirante" -> demoUser.copy(name = "Valeria Gomez", email = "valeria.gomez@aspirante.org", role = "Aspirante", moodleId = "MOODLE-ASP-992")
-                "Coordinador" -> demoUser.copy(name = "Dr. Carlos Mendoza", email = "carlos.mendoza@iinicia.org", role = "Coordinador", moodleId = "MOODLE-COORD-301")
-                "Admin TI" -> demoUser.copy(name = "Ing. Roberto Soto", email = "roberto.soto@iinicia.org", role = "Admin TI", moodleId = "MOODLE-ADM-001")
-                else -> demoUser
-            }
-            Result.success(user)
+            Result.failure(e)
         }
     }
 
@@ -169,7 +177,7 @@ class IiniciaRepository(context: Context) {
         return try {
             val response = supabaseApi.getCursosSupabase(
                 apiKey = SupabaseClient.SUPABASE_KEY,
-                auth = "Bearer ${SupabaseClient.SUPABASE_KEY}"
+                auth = "Bearer ${tokenManager.getToken() ?: SupabaseClient.SUPABASE_KEY}"
             )
             if (response.isSuccessful && !response.body().isNullOrEmpty()) {
                 return Result.success(response.body()!!)
@@ -184,7 +192,7 @@ class IiniciaRepository(context: Context) {
         return try {
             val response = supabaseApi.getCursosSupabase(
                 apiKey = SupabaseClient.SUPABASE_KEY,
-                auth = "Bearer ${SupabaseClient.SUPABASE_KEY}"
+                auth = "Bearer ${tokenManager.getToken() ?: SupabaseClient.SUPABASE_KEY}"
             )
             if (response.isSuccessful && !response.body().isNullOrEmpty()) {
                 val found = response.body()!!.find { it.id == courseId }

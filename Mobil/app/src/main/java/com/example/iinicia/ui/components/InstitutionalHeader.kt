@@ -12,8 +12,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
@@ -39,7 +39,11 @@ fun InstitutionalHeader(
     onProfileClick: () -> Unit,
     onMoodleSsoClick: () -> Unit
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .statusBarsPadding() // Prevents overlapping with phone status bar (time, battery, notifications)
+    ) {
         // 1. Top Notice Bar (Dark Blue #0B1B3D with Cyan text)
         Box(
             modifier = Modifier
@@ -70,12 +74,12 @@ fun InstitutionalHeader(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                // Logo & Isotipo using @drawable/logo_iinicia
+                // Logo & Isotipo using @drawable/logo_iinicia next to "IINICIA" text
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Image(
                         painter = painterResource(id = R.drawable.logo_iinicia),
                         contentDescription = "Logo IINICIA",
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(32.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(

@@ -24,6 +24,14 @@ interface IiniciaApi {
     @GET("api/notifications")
     suspend fun getNotifications(): Response<List<NotificationDto>>
 
+    // Supabase Auth endpoint
+    @POST("auth/v1/token")
+    suspend fun supabaseSignIn(
+        @Header("apikey") apiKey: String,
+        @Query("grant_type") grantType: String = "password",
+        @Body request: SupabaseLoginRequest
+    ): Response<SupabaseAuthResponse>
+
     // Supabase REST endpoints
     @GET("rest/v1/cursos")
     suspend fun getCursosSupabase(
