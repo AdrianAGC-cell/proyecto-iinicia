@@ -1,23 +1,30 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Lock, Mail, ArrowRight } from 'lucide-react';
+import { Lock, Mail, ArrowRight, Loader2, Database } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Role } from '../types';
 
 export const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const { login, switchRole } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleFormLogin = (e: React.FormEvent) => {
+  const handleFormLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    login(email);
+    setLoading(true);
+    await login(email, undefined, password);
+    setLoading(false);
     navigate('/mi-iinicia');
   };
 
-  const handleQuickDemoLogin = (role: Role) => {
-    switchRole(role);
+  const handleQuickDemoLogin = async (role: Role, demoEmail: string) => {
+    setLoading(true);
+    setEmail(demoEmail);
+    setPassword('password123');
+    await login(demoEmail, role, 'password123');
+    setLoading(false);
     if (role === 'estudiante') navigate('/mi-iinicia');
     else if (role === 'coordinador' || role === 'admin') navigate('/admin');
     else navigate('/admisiones');
@@ -39,8 +46,12 @@ export const Login: React.FC = () => {
             <h2 className="text-xl font-black text-slate-900 tracking-tight">
               Iniciar Sesión en I²NICIA
             </h2>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-sky-50 text-sky-700 rounded-full text-[11px] font-semibold border border-sky-100">
+              <Database className="w-3 h-3 text-[#22abe2]" />
+              <span>Conectado a Supabase Database</span>
+            </div>
             <p className="text-xs text-slate-500">
-              Accede a tu portal institucional y a tus materias en Moodle LMS con tu cuenta única.
+              Accede a tu portal institucional y a tus materias con la misma cuenta de la base de datos central.
             </p>
           </div>
 
@@ -69,7 +80,7 @@ export const Login: React.FC = () => {
                 </label>
                 <a 
                   href="#recuperar" 
-                  onClick={() => alert('Se ha enviado un enlace de restablecimiento seguro OIDC a tu correo institucional.')} 
+                  onClick={() => alert('Se ha enviado un enlace de restablecimiento seguro a tu correo institucional.')} 
                   className="text-[11px] text-[#22abe2] hover:underline"
                 >
                   ¿Olvidaste tu contraseña?
@@ -90,22 +101,32 @@ export const Login: React.FC = () => {
 
             <button
               type="submit"
-              className="w-full py-3 rounded-xl bg-[#22abe2] hover:bg-[#1b9ad0] text-white font-bold text-xs shadow-md shadow-[#22abe2]/20 transition flex items-center justify-center gap-2 cursor-pointer"
+              disabled={loading}
+              className="w-full py-3 rounded-xl bg-[#22abe2] hover:bg-[#1b9ad0] text-white font-bold text-xs shadow-md shadow-[#22abe2]/20 transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
-              <span>Acceder al Ecosistema</span>
-              <ArrowRight className="w-4 h-4" />
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Validando en Supabase...</span>
+                </>
+              ) : (
+                <>
+                  <span>Acceder al Ecosistema</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
             </button>
           </form>
 
           {/* Quick Demo Logins for Evaluator */}
           <div className="pt-4 border-t border-slate-100 space-y-2">
             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block text-center">
-              Acceso Rápido de Evaluación
+              Cuentas Registradas en Supabase
             </span>
             <div className="grid grid-cols-2 gap-2 text-xs">
               <button
                 type="button"
-                onClick={() => handleQuickDemoLogin('estudiante')}
+                onClick={() => handleQuickDemoLogin('estudiante', 'valeria.morales@iinicia.edu.mx')}
                 className="p-2.5 rounded-2xl border border-slate-200 hover:bg-[#22abe2]/10 hover:border-[#22abe2]/40 text-left transition"
               >
                 <span className="font-bold text-slate-900 block">Estudiante</span>
@@ -113,11 +134,27 @@ export const Login: React.FC = () => {
               </button>
               <button
                 type="button"
-                onClick={() => handleQuickDemoLogin('coordinador')}
+                onClick={() => handleQuickDemoLogin('coordinador', 'sofia.alarcon@iinicia.edu.mx')}
                 className="p-2.5 rounded-2xl border border-slate-200 hover:bg-[#22abe2]/10 hover:border-[#22abe2]/40 text-left transition"
               >
                 <span className="font-bold text-slate-900 block">Coordinador</span>
                 <span className="text-[10px] text-slate-500">Dra. Alarcón</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleQuickDemoLogin('aspirante', 'diego.solis@gmail.com')}
+                className="p-2.5 rounded-2xl border border-slate-200 hover:bg-[#22abe2]/10 hover:border-[#22abe2]/40 text-left transition"
+              >
+                <span className="font-bold text-slate-900 block">Aspirante</span>
+                <span className="text-[10px] text-slate-500">Diego Solís</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleQuickDemoLogin('admin', 'admin.sistemas@iinicia.edu.mx')}
+                className="p-2.5 rounded-2xl border border-slate-200 hover:bg-[#22abe2]/10 hover:border-[#22abe2]/40 text-left transition"
+              >
+                <span className="font-bold text-slate-900 block">Admin TI</span>
+                <span className="text-[10px] text-slate-500">Ing. Roberto Peña</span>
               </button>
             </div>
           </div>

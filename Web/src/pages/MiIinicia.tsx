@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Sparkles, 
   ExternalLink, 
@@ -17,13 +17,40 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { MOCK_STUDENT_COURSES } from '../data/mockData';
 import { SafeImage } from '../components/common/SafeImage';
+import { supabase } from '../lib/supabase';
+import { Course } from '../types';
 
 export const MiIinicia: React.FC = () => {
   const { user, triggerMoodleSSO } = useAuth();
   const [activeTab, setActiveTab] = useState<'cursos' | 'entregas' | 'calificaciones' | 'tramites'>('cursos');
   const [idCardOpen, setIdCardOpen] = useState(false);
+  const [courses, setCourses] = useState<Course[]>(MOCK_STUDENT_COURSES);
 
-  const courses = MOCK_STUDENT_COURSES;
+  useEffect(() => {
+    const loadSupabaseCourses = async () => {
+      try {
+        const { data, error } = await supabase.from('courses').select('*');
+        if (data && data.length > 0 && !error) {
+          const mapped: Course[] = data.map((c: any) => ({
+            id: c.id,
+            code: c.code || 'IA-401',
+            name: c.name,
+            professor: c.professor_name || 'Dr. Alejandro Méndez',
+            progress: 75,
+            pendingTasks: 1,
+            nextDeadline: '28 Octubre, 23:59',
+            grade: 9.4,
+            moodleCourseId: c.moodle_course_id || 204,
+            color: c.color_gradient || 'from-blue-600 to-indigo-700'
+          }));
+          setCourses(mapped);
+        }
+      } catch (e) {
+        console.warn('Error loading courses from Supabase:', e);
+      }
+    };
+    loadSupabaseCourses();
+  }, []);
 
   const upcomingDeadlines = [
     {

@@ -1,12 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, Role } from '../types';
 import { DEMO_USERS } from '../data/mockData';
+import { supabase } from '../lib/supabase';
 
 interface AuthContextType {
   user: User | null;
   role: Role;
   isAuthenticated: boolean;
-  login: (email: string, role?: Role) => boolean;
+  login: (email: string, role?: Role, password?: string) => Promise<boolean>;
   logout: () => void;
   switchRole: (newRole: Role) => void;
   ssoModalOpen: boolean;
@@ -18,7 +19,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Default to estudiante for immediate rich experience, or from localStorage
+  // Restore saved user or default to estudiante
   const [user, setUser] = useState<User | null>(() => {
     const saved = localStorage.getItem('iinicia_user');
     if (saved) {
@@ -42,10 +43,101 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [user]);
 
-  const login = (email: string, roleParam?: Role) => {
-    const roleKey = roleParam || 'estudiante';
-    const foundUser = DEMO_USERS[roleKey] || DEMO_USERS.estudiante;
-    setUser({ ...foundUser, email: email || foundUser.email });
+  const login = async (email: string, roleParam?: Role, _password?: string): Promise<boolean> => {
+    const cleanEmail = (email || '').trim().toLowerCase();
+
+    // 1. Check Supabase 'users' table
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .ilike('email', cleanEmail)
+        .maybeSingle();
+
+      if (data && !error) {
+        let mappedRole: Role = 'estudiante';
+        const rawRole = (data.role_id || '').toLowerCase();
+        if (rawRole === 'admin' || rawRole === 'superadmin' || rawRole === 'admin_academico') {
+          mappedRole = 'admin';
+        } else if (rawRole === 'coordinador') {
+          mappedRole = 'coordinador';
+        } else if (rawRole === 'profesor') {
+          mappedRole = 'profesor';
+        } else if (rawRole === 'aspirante') {
+          mappedRole = 'aspirante';
+        }
+
+        const dbUser: User = {
+          id: data.id,
+          name: data.full_name || cleanEmail.split('@')[0],
+          email: data.email,
+          role: mappedRole,
+          matricula: data.matricula || undefined,
+          programId: data.program_id || undefined,
+          programName: data.program_name || undefined,
+          semester: data.current_semester || undefined,
+          avatar: data.avatar_url || undefined,
+          moodleId: 1042
+        };
+
+        setUser(dbUser);
+        return true;
+      }
+    } catch (err) {
+      console.warn('[Supabase AuthContext] Users table query error:', err);
+    }
+
+    // 2. Check Supabase 'admission_applications' table (permite iniciar sesión a aspirantes y admitidos)
+    try {
+      const { data: appData, error: appError } = await supabase
+        .from('admission_applications')
+        .select('*')
+        .ilike('email', cleanEmail)
+        .maybeSingle();
+
+      if (appData && !appError) {
+        const isAdmitido = (appData.status || '').toUpperCase() === 'ADMITIDO';
+        const mappedRole: Role = isAdmitido ? 'estudiante' : 'aspirante';
+        const moodleIdNum = appData.moodle_user_id || 1042;
+        const matricula = isAdmitido
+          ? `IIN-2026-${appData.moodle_user_id || appData.id.replace('SOL-2026-', '')}`
+          : undefined;
+
+        const applicantUser: User = {
+          id: appData.id,
+          name: appData.full_name,
+          email: appData.email,
+          role: mappedRole,
+          matricula,
+          programId: appData.program_id,
+          programName: appData.program_name,
+          semester: isAdmitido ? 1 : undefined,
+          avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+          moodleId: moodleIdNum
+        };
+
+        setUser(applicantUser);
+        return true;
+      }
+    } catch (err) {
+      console.warn('[Supabase AuthContext] Applications query error:', err);
+    }
+
+    // 3. Fallback persona for testing
+    const roleKey =
+      roleParam ||
+      (cleanEmail.includes('admin')
+        ? 'admin'
+        : cleanEmail.includes('coord')
+        ? 'coordinador'
+        : cleanEmail.includes('prof')
+        ? 'profesor'
+        : cleanEmail.includes('asp') || cleanEmail.includes('solis')
+        ? 'aspirante'
+        : 'estudiante');
+
+    const fallbackUser = DEMO_USERS[roleKey] || DEMO_USERS.estudiante;
+    setUser({ ...fallbackUser, email: cleanEmail || fallbackUser.email });
     return true;
   };
 

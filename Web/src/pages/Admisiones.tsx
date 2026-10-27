@@ -11,9 +11,13 @@ import {
   ChevronUp, 
   GraduationCap, 
   ShieldCheck,
-  Calendar
+  Calendar,
+  Database,
+  Search,
+  Loader2
 } from 'lucide-react';
 import { MOCK_PROGRAMS } from '../data/mockData';
+import { supabase } from '../lib/supabase';
 
 export const Admisiones: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -32,6 +36,12 @@ export const Admisiones: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [submittedFolio, setSubmittedFolio] = useState<string | null>(null);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
+
+  // Live Supabase Lookup State
+  const [lookupQuery, setLookupQuery] = useState('');
+  const [lookupResult, setLookupResult] = useState<any>(null);
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [lookupSearched, setLookupSearched] = useState(false);
 
   const steps = [
     {
@@ -80,32 +90,76 @@ export const Admisiones: React.FC = () => {
     }
   ];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
 
-    setTimeout(() => {
-      const generatedFolio = `SOL-2026-${Math.floor(1000 + Math.random() * 9000)}`;
-      setSubmittedFolio(generatedFolio);
-      setSubmitting(false);
+    const generatedFolio = `SOL-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+    const prog = MOCK_PROGRAMS.find(p => p.id === formData.programId);
+    const progTitle = prog ? prog.title : 'Programa Académico';
 
-      const savedApps = JSON.parse(localStorage.getItem('iinicia_apps') || '[]');
-      const prog = MOCK_PROGRAMS.find(p => p.id === formData.programId);
-      savedApps.unshift({
-        id: generatedFolio,
-        fullName: formData.fullName,
-        email: formData.email,
-        phone: formData.phone,
-        programId: formData.programId,
-        programName: prog ? prog.title : 'Programa Académico',
-        previousSchool: formData.previousSchool,
-        averageGrade: formData.averageGrade,
-        status: 'EN REVISION',
-        moodleSynced: false,
-        date: new Date().toISOString().split('T')[0]
-      });
-      localStorage.setItem('iinicia_apps', JSON.stringify(savedApps));
-    }, 900);
+    try {
+      await supabase.from('admission_applications').insert([
+        {
+          id: generatedFolio,
+          full_name: formData.fullName,
+          email: formData.email.trim().toLowerCase(),
+          phone: formData.phone || null,
+          program_id: formData.programId,
+          program_name: progTitle,
+          previous_school: formData.previousSchool || 'Bachillerato General',
+          average_grade: parseFloat(formData.averageGrade) || 9.0,
+          status: 'EN REVISION',
+          moodle_synced: false
+        }
+      ]);
+    } catch (err) {
+      console.warn('Could not insert application into Supabase:', err);
+    }
+
+    const savedApps = JSON.parse(localStorage.getItem('iinicia_apps') || '[]');
+    savedApps.unshift({
+      id: generatedFolio,
+      fullName: formData.fullName,
+      email: formData.email,
+      phone: formData.phone,
+      programId: formData.programId,
+      programName: progTitle,
+      previousSchool: formData.previousSchool,
+      averageGrade: formData.averageGrade,
+      status: 'EN REVISION',
+      moodleSynced: false,
+      date: new Date().toISOString().split('T')[0]
+    });
+    localStorage.setItem('iinicia_apps', JSON.stringify(savedApps));
+
+    setSubmittedFolio(generatedFolio);
+    setSubmitting(false);
+  };
+
+  const handleLookupSupabase = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!lookupQuery.trim()) return;
+    setLookupLoading(true);
+    setLookupSearched(true);
+    setLookupResult(null);
+
+    try {
+      const q = lookupQuery.trim();
+      const { data, error } = await supabase
+        .from('admission_applications')
+        .select('*')
+        .or(`id.eq.${q},email.ilike.${q}`)
+        .maybeSingle();
+
+      if (data && !error) {
+        setLookupResult(data);
+      }
+    } catch (err) {
+      console.warn('Lookup error:', err);
+    } finally {
+      setLookupLoading(false);
+    }
   };
 
   return (
@@ -344,6 +398,92 @@ export const Admisiones: React.FC = () => {
                 )}
               </button>
             </form>
+          )}
+        </div>
+      </section>
+
+      {/* Live Supabase Application Verifier */}
+      <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-md space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-sky-50 text-sky-700 rounded-full text-xs font-semibold mb-2">
+                <Database className="w-3.5 h-3.5 text-[#22abe2]" />
+                <span>Base de Datos Oficial Supabase</span>
+              </div>
+              <h3 className="text-xl font-black text-slate-900">
+                Comprueba si tu Registro se Guardó en Supabase
+              </h3>
+              <p className="text-xs text-slate-500">
+                Ingresa tu Folio Oficial (ej. SOL-2026-9040) o tu correo para consultar tu estatus en vivo.
+              </p>
+            </div>
+          </div>
+
+          <form onSubmit={handleLookupSupabase} className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Ingresa Folio (SOL-2026-...) o tu correo electrónico"
+                value={lookupQuery}
+                onChange={(e) => setLookupQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-[#22abe2] focus:outline-none"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={lookupLoading}
+              className="px-6 py-2.5 rounded-xl bg-[#22abe2] hover:bg-[#1b9ad0] text-white font-bold text-xs transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+            >
+              {lookupLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Buscando en BD...</span>
+                </>
+              ) : (
+                <>
+                  <Database className="w-4 h-4" />
+                  <span>Consultar en Supabase</span>
+                </>
+              )}
+            </button>
+          </form>
+
+          {lookupSearched && (
+            <div className="pt-2">
+              {lookupResult ? (
+                <div className="p-5 bg-emerald-50 border border-emerald-200 rounded-2xl space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-emerald-800 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      ¡Registro localizado exitosamente en Supabase!
+                    </span>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                      {lookupResult.status}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 text-slate-700">
+                    <div>
+                      <p className="text-[10px] text-slate-400">Folio</p>
+                      <p className="font-mono font-bold text-slate-900">{lookupResult.id}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-slate-400">Aspirante</p>
+                      <p className="font-semibold text-slate-900">{lookupResult.full_name}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-slate-400">Programa</p>
+                      <p className="font-semibold text-slate-900 truncate">{lookupResult.program_name}</p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-800">
+                  No se encontró ningún expediente con ese folio o correo en la base de datos de Supabase. Asegúrate de haber completado y enviado el formulario arriba.
+                </div>
+              )}
+            </div>
           )}
         </div>
       </section>

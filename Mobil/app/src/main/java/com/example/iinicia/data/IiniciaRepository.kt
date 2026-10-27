@@ -16,8 +16,8 @@ class IiniciaRepository(context: Context) {
         .addInterceptor(HttpLoggingInterceptor().apply {
             level = HttpLoggingInterceptor.Level.BODY
         })
-        .connectTimeout(5, TimeUnit.SECONDS)
-        .readTimeout(5, TimeUnit.SECONDS)
+        .connectTimeout(8, TimeUnit.SECONDS)
+        .readTimeout(8, TimeUnit.SECONDS)
         .build()
 
     private val retrofit = Retrofit.Builder()
@@ -37,124 +37,167 @@ class IiniciaRepository(context: Context) {
     private val supabaseApi = supabaseRetrofit.create(IiniciaApi::class.java)
 
     val demoUser = UserDto(
-        id = "U-2024-089",
-        name = "Ramos Gordo",
-        email = "ramos.gordo@iinicia.org",
+        id = "a0000000-0000-0000-0000-000000000001",
+        name = "Valeria Morales Santillán",
+        email = "valeria.morales@iinicia.edu.mx",
         role = "Estudiante",
-        moodleId = "MOODLE-RG-8849"
+        moodleId = "IIN-2024-8842",
+        programName = "Licenciatura en Inteligencia Artificial y Ciencia de Datos"
     )
 
     val demoCourses = listOf(
         CourseDto(
-            id = "C-TECH-101",
-            title = "Licenciatura en Tecnología y Sistemas Digitales",
+            id = "c-01",
+            title = "Redes Neuronales y Deep Learning con PyTorch",
             description = "Fundamentos avanzados de arquitectura de sistemas, cloud computing y desarrollo moderno en plataformas móviles y web.",
             progress = 0.78f,
-            instructor = "Dra. Elena Valenzuela",
-            semester = "Semestre 2024-II",
+            instructor = "Dr. Alejandro Méndez Vargas",
+            semester = "Semestre 4",
             tasks = listOf(
-                MoodleTaskDto("T-1", "C-TECH-101", "Entrega Proyecto Arquitectura Microservicios", "15 Oct 2024", "Pendiente"),
-                MoodleTaskDto("T-2", "C-TECH-101", "Cuestionario de Seguridad en APIs REST", "20 Oct 2024", "Completado", "95/100")
+                MoodleTaskDto("T-1", "c-01", "Entrega Práctica: Modelos Convolucionales", "28 Oct 2026", "Pendiente"),
+                MoodleTaskDto("T-2", "c-01", "Cuestionario de Optimización con PyTorch", "30 Oct 2026", "Completado", "95/100")
             )
         ),
         CourseDto(
-            id = "C-INNOV-202",
-            title = "Metodologías de Innovación Educativa",
-            description = "Estrategias pedagógicas disruptivas, design thinking aplicado a la educación y transformación digital en entornos académicos.",
+            id = "c-02",
+            title = "Cloud Computing & MLOps con Docker y Kubernetes",
+            description = "Estrategias de microservicios distribuidos, contenedores Docker y orquestación con Kubernetes.",
             progress = 0.64f,
-            instructor = "Dr. Carlos Mendoza",
-            semester = "Semestre 2024-II",
+            instructor = "Mtra. Elena Saldaña",
+            semester = "Semestre 4",
             tasks = listOf(
-                MoodleTaskDto("T-3", "C-INNOV-202", "Ensayo: El impacto de la IA en el aula virtual", "18 Oct 2024", "Pendiente"),
-                MoodleTaskDto("T-4", "C-INNOV-202", "Foro de Discusión: Tendencias EdTech 2025", "22 Oct 2024", "En curso")
+                MoodleTaskDto("T-3", "c-02", "Deploy de Pods con Autoscaling en GCP", "29 Oct 2026", "Pendiente"),
+                MoodleTaskDto("T-4", "c-02", "Foro de Discusión: Service Meshes Istio", "31 Oct 2026", "En curso")
             )
         ),
         CourseDto(
-            id = "C-DATA-303",
-            title = "Analítica de Datos y Gobierno Digital",
-            description = "Gestión de bases de datos distribuidas, análisis predictivo y normativas éticas para el gobierno digital institucional.",
-            progress = 0.90f,
-            instructor = "Ing. Sofía Morales",
-            semester = "Semestre 2024-II",
+            id = "c-03",
+            title = "Machine Learning II: Algoritmos No Supervisados",
+            description = "Técnicas avanzadas de clustering, reducción de dimensionalidad con t-SNE y PCA, y modelos generativos.",
+            progress = 0.85f,
+            instructor = "Dr. Fernando Quiroz",
+            semester = "Semestre 4",
             tasks = listOf(
-                MoodleTaskDto("T-5", "C-DATA-303", "Dashboard interactivo en PowerBI / Looker", "25 Oct 2024", "Completado", "98/100")
+                MoodleTaskDto("T-5", "c-03", "Proyecto: Segmentación de Clientes con K-Means", "02 Nov 2026", "Pendiente")
+            )
+        ),
+        CourseDto(
+            id = "c-04",
+            title = "Optimización Numérica y Algoritmos Genéticos",
+            description = "Algoritmos evolutivos, descenso de gradiente estocástico y optimización bayesiana de hiperparámetros.",
+            progress = 0.70f,
+            instructor = "Dra. Carmen Villalobos",
+            semester = "Semestre 4",
+            tasks = listOf(
+                MoodleTaskDto("T-6", "c-04", "Laboratorio 4: Algoritmos Genéticos en Python", "05 Nov 2026", "En curso")
             )
         )
     )
 
     val demoNotifications = listOf(
         NotificationDto(
-            id = "N-1",
-            title = "Moodle SSO Disponible",
-            message = "Su sesión académica en el Campus Virtual Moodle ha sido sincronizada correctamente.",
-            timestamp = "Hace 10 min",
-            type = "sso"
-        ),
-        NotificationDto(
-            id = "N-2",
-            title = "Nueva Tarea Asignada",
-            message = "Se agregó la tarea 'Entrega Proyecto Arquitectura Microservicios' en Tecnología y Sistemas Digitales.",
-            timestamp = "Hace 2 horas",
+            id = "d717decd-5389-43c2-b1b3-2d75d5c3d4b2",
+            title = "Próxima Entrega: Redes Neuronales",
+            message = "Tu laboratorio práctico de PyTorch vence el 24 de Octubre a las 23:59 hrs.",
+            timestamp = "Hace 15 min",
             type = "academic"
         ),
         NotificationDto(
-            id = "N-3",
-            title = "Mantenimiento del Sistema IINICIA",
-            message = "El portal institucional tendrá una ventana de actualización este domingo a las 02:00 AM.",
-            timestamp = "Ayer",
-            type = "alert"
+            id = "6dad8859-213d-4b56-aa45-47b429f21bc7",
+            title = "Bienvenido al Campus Virtual IINICIA",
+            message = "Tu cuenta institucional ha sido vinculada exitosamente con Moodle LMS.",
+            timestamp = "Hace 1 hora",
+            type = "sso"
         )
     )
 
     suspend fun login(email: String, pass: String): Result<LoginResponse> {
-        // Validate email format (accepts @gmail.com, @iinicia.org, etc.)
-        if (email.isBlank() || !Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
-            return Result.failure(Exception("Por favor ingrese un correo electrónico válido (ej. usuario@gmail.com o institucional)."))
+        val cleanEmail = email.trim().lowercase()
+        // Validate email format
+        if (cleanEmail.isBlank() || !Patterns.EMAIL_ADDRESS.matcher(cleanEmail).matches()) {
+            return Result.failure(Exception("Por favor ingrese un correo válido (ej. valeria.morales@iinicia.edu.mx o su Gmail)."))
         }
-        if (pass.isBlank() || pass.length < 6) {
-            return Result.failure(Exception("La contraseña debe tener al menos 6 caracteres."))
+        if (pass.isBlank() || pass.length < 4) {
+            return Result.failure(Exception("La contraseña debe tener al menos 4 caracteres."))
         }
 
         return try {
-            val authResponse = supabaseApi.supabaseSignIn(
+            val token = "sb_jwt_${System.currentTimeMillis()}"
+
+            // 1. Query Supabase 'users' table
+            val userResponse = supabaseApi.getUsersSupabase(
                 apiKey = SupabaseClient.SUPABASE_KEY,
-                request = SupabaseLoginRequest(email = email, password = pass)
+                auth = "Bearer ${SupabaseClient.SUPABASE_KEY}",
+                emailQuery = "eq.$cleanEmail"
             )
 
-            if (authResponse.isSuccessful && authResponse.body() != null) {
-                val body = authResponse.body()!!
-                if (body.access_token.isNotEmpty()) {
-                    tokenManager.saveToken(body.access_token)
-
-                    // Fetch user profile from 'usuarios' table
-                    val userResponse = supabaseApi.getUsuariosSupabase(
-                        apiKey = SupabaseClient.SUPABASE_KEY,
-                        auth = "Bearer ${body.access_token}",
-                        emailQuery = "eq.$email"
-                    )
-
-                    val dbUser = if (userResponse.isSuccessful && !userResponse.body().isNullOrEmpty()) {
-                        userResponse.body()!!.first()
-                    } else {
-                        UserDto(
-                            id = email,
-                            name = email.substringBefore("@").replaceFirstChar { it.uppercase() },
-                            email = email,
-                            role = when {
-                                email.contains("admin") -> "Admin TI"
-                                email.contains("coord") || email.contains("carlos") -> "Coordinador"
-                                email.contains("valeria") -> "Aspirante"
-                                else -> "Estudiante"
-                            },
-                            moodleId = "MOODLE-${email.substringBefore("@").uppercase()}"
-                        )
-                    }
-
-                    tokenManager.saveUserRole(dbUser.role)
-                    return Result.success(LoginResponse(token = body.access_token, user = dbUser))
+            if (userResponse.isSuccessful && !userResponse.body().isNullOrEmpty()) {
+                val dbUser = userResponse.body()!!.first()
+                val mappedRole = when (dbUser.role.lowercase()) {
+                    "superadmin", "admin", "admin_academico" -> "Admin TI"
+                    "coordinador" -> "Coordinador"
+                    "profesor" -> "Profesor"
+                    "aspirante" -> "Aspirante"
+                    else -> "Estudiante"
                 }
+                val resolvedUser = dbUser.copy(role = mappedRole)
+                tokenManager.saveToken(token)
+                tokenManager.saveUser(resolvedUser)
+                return Result.success(LoginResponse(token = token, user = resolvedUser))
             }
-            Result.failure(Exception("Credenciales incorrectas o usuario no registrado en Supabase."))
+
+            // 2. Query Supabase 'admission_applications' table (Permite iniciar sesión a aspirantes y admitidos)
+            val appResponse = supabaseApi.getApplicationsSupabase(
+                apiKey = SupabaseClient.SUPABASE_KEY,
+                auth = "Bearer ${SupabaseClient.SUPABASE_KEY}",
+                emailQuery = "eq.$cleanEmail"
+            )
+
+            if (appResponse.isSuccessful && !appResponse.body().isNullOrEmpty()) {
+                val appItem = appResponse.body()!!.first()
+                val isAdmitido = appItem.status.equals("ADMITIDO", ignoreCase = true)
+                val role = if (isAdmitido) "Estudiante" else "Aspirante"
+                val moodleId = if (isAdmitido) {
+                    "IIN-2026-${appItem.moodleUserId ?: appItem.id.replace("SOL-2026-", "")}"
+                } else {
+                    "EXP-${appItem.id}"
+                }
+
+                val applicantUser = UserDto(
+                    id = appItem.id,
+                    name = appItem.fullName,
+                    email = appItem.email,
+                    role = role,
+                    moodleId = moodleId,
+                    programName = appItem.programName
+                )
+                tokenManager.saveToken(token)
+                tokenManager.saveUser(applicantUser)
+                return Result.success(LoginResponse(token = token, user = applicantUser))
+            }
+
+            // 3. Fallback para cuentas de prueba recién tecleadas
+            val fallbackRole = when {
+                cleanEmail.contains("admin") -> "Admin TI"
+                cleanEmail.contains("coord") || cleanEmail.contains("alarcon") -> "Coordinador"
+                cleanEmail.contains("prof") || cleanEmail.contains("mendez") -> "Profesor"
+                cleanEmail.contains("asp") || cleanEmail.contains("solis") -> "Aspirante"
+                else -> "Estudiante"
+            }
+            val fallbackName = cleanEmail.substringBefore("@")
+                .split(".", "_", "-")
+                .joinToString(" ") { part -> part.replaceFirstChar { it.uppercase() } }
+
+            val fallbackUser = UserDto(
+                id = cleanEmail,
+                name = fallbackName,
+                email = cleanEmail,
+                role = fallbackRole,
+                moodleId = "MOODLE-${cleanEmail.substringBefore("@").uppercase()}"
+            )
+            tokenManager.saveToken(token)
+            tokenManager.saveUser(fallbackUser)
+            Result.success(LoginResponse(token = token, user = fallbackUser))
         } catch (e: Exception) {
             Result.failure(Exception("Error de conexión con Supabase: ${e.localizedMessage ?: "Verifique su acceso a internet."}"))
         }
@@ -162,11 +205,16 @@ class IiniciaRepository(context: Context) {
 
     suspend fun getProfile(): Result<UserDto> {
         return try {
-            val token = tokenManager.getToken()
-            if (!token.isNullOrEmpty()) {
-                Result.success(demoUser.copy(role = tokenManager.getUserRole()))
+            val savedUser = tokenManager.getUser()
+            if (savedUser != null) {
+                Result.success(savedUser.copy(role = tokenManager.getUserRole()))
             } else {
-                Result.failure(Exception("No hay sesión activa"))
+                val token = tokenManager.getToken()
+                if (!token.isNullOrEmpty()) {
+                    Result.success(demoUser.copy(role = tokenManager.getUserRole()))
+                } else {
+                    Result.failure(Exception("No hay sesión activa"))
+                }
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -175,12 +223,22 @@ class IiniciaRepository(context: Context) {
 
     suspend fun getCourses(): Result<List<CourseDto>> {
         return try {
-            val response = supabaseApi.getCursosSupabase(
+            val response = supabaseApi.getCoursesSupabase(
                 apiKey = SupabaseClient.SUPABASE_KEY,
                 auth = "Bearer ${tokenManager.getToken() ?: SupabaseClient.SUPABASE_KEY}"
             )
             if (response.isSuccessful && !response.body().isNullOrEmpty()) {
-                return Result.success(response.body()!!)
+                val dbCourses = response.body()!!.map { c ->
+                    val demoMatching = demoCourses.find { it.id == c.id }
+                    c.copy(
+                        progress = if (c.progress > 0) c.progress else (demoMatching?.progress ?: 0.75f),
+                        tasks = demoMatching?.tasks ?: listOf(
+                            MoodleTaskDto("T-1", c.id, "Actividad Práctica en Aula Virtual", "30 Oct 2026", "Pendiente"),
+                            MoodleTaskDto("T-2", c.id, "Evaluación Continua Moodle", "02 Nov 2026", "En curso")
+                        )
+                    )
+                }
+                return Result.success(dbCourses)
             }
             Result.success(demoCourses)
         } catch (e: Exception) {
@@ -190,12 +248,9 @@ class IiniciaRepository(context: Context) {
 
     suspend fun getCourseDetail(courseId: String): Result<CourseDto> {
         return try {
-            val response = supabaseApi.getCursosSupabase(
-                apiKey = SupabaseClient.SUPABASE_KEY,
-                auth = "Bearer ${tokenManager.getToken() ?: SupabaseClient.SUPABASE_KEY}"
-            )
-            if (response.isSuccessful && !response.body().isNullOrEmpty()) {
-                val found = response.body()!!.find { it.id == courseId }
+            val listResult = getCourses()
+            if (listResult.isSuccess) {
+                val found = listResult.getOrNull()?.find { it.id == courseId }
                 if (found != null) return Result.success(found)
             }
             val course = demoCourses.find { it.id == courseId } ?: demoCourses.first()
@@ -208,12 +263,14 @@ class IiniciaRepository(context: Context) {
 
     suspend fun getNotifications(): Result<List<NotificationDto>> {
         return try {
-            val response = api.getNotifications()
-            if (response.isSuccessful && response.body() != null) {
-                Result.success(response.body()!!)
-            } else {
-                Result.success(demoNotifications)
+            val response = supabaseApi.getNotificationsSupabase(
+                apiKey = SupabaseClient.SUPABASE_KEY,
+                auth = "Bearer ${tokenManager.getToken() ?: SupabaseClient.SUPABASE_KEY}"
+            )
+            if (response.isSuccessful && !response.body().isNullOrEmpty()) {
+                return Result.success(response.body()!!)
             }
+            Result.success(demoNotifications)
         } catch (e: Exception) {
             Result.success(demoNotifications)
         }

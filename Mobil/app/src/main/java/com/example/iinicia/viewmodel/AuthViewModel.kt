@@ -23,17 +23,9 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     private val _authState = MutableStateFlow<AuthState>(
         try {
             val token = repository.getTokenManager().getToken()
-            if (!token.isNullOrEmpty() && !token.startsWith("demo_")) {
-                val role = repository.getTokenManager().getUserRole()
-                AuthState.Success(
-                    UserDto(
-                        id = "user_session",
-                        name = "Usuario IINICIA",
-                        email = "usuario@iinicia.org",
-                        role = role,
-                        moodleId = "MOODLE-USER-01"
-                    )
-                )
+            val savedUser = repository.getTokenManager().getUser()
+            if (!token.isNullOrEmpty() && savedUser != null) {
+                AuthState.Success(savedUser)
             } else {
                 AuthState.Idle
             }

@@ -3,8 +3,11 @@ package com.example.iinicia.ui.screens
 import android.util.Patterns
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -62,7 +65,7 @@ fun LoginScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(DarkBackground)
-            .padding(24.dp),
+            .padding(20.dp),
         contentAlignment = Alignment.Center
     ) {
         Card(
@@ -74,33 +77,33 @@ fun LoginScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(24.dp),
+                    .padding(20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Institutional Logo (White variant for dark background)
+                // Institutional Logo
                 Image(
                     painter = painterResource(id = R.drawable.logo_iinicia_white),
                     contentDescription = "Logo IINICIA",
-                    modifier = Modifier.size(56.dp)
+                    modifier = Modifier.size(52.dp)
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 // Header Logo Title
                 Text(
                     text = "IINICIA",
-                    fontSize = 28.sp,
+                    fontSize = 26.sp,
                     fontWeight = FontWeight.Bold,
                     color = CyanAccent
                 )
                 Text(
                     text = "Instituto de Innovación y Ciencias Aplicadas",
-                    fontSize = 12.sp,
+                    fontSize = 11.sp,
                     color = TextMuted,
                     textAlign = TextAlign.Center
                 )
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(18.dp))
 
                 OutlinedTextField(
                     value = email,
@@ -108,12 +111,12 @@ fun LoginScreen(
                         email = it
                         errorMessage = null
                     },
-                    label = { Text("Correo electrónico (Gmail o institucional)", color = TextMuted) },
+                    label = { Text("Correo (ej. valeria.morales@iinicia.edu.mx)", color = TextMuted) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
                 OutlinedTextField(
                     value = password,
@@ -128,7 +131,7 @@ fun LoginScreen(
                 )
 
                 if (errorMessage != null || authState is AuthState.Error) {
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
                     Text(
                         text = errorMessage ?: (authState as? AuthState.Error)?.message ?: "",
                         color = MaterialTheme.colorScheme.error,
@@ -137,24 +140,24 @@ fun LoginScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(18.dp))
 
                 // Login Button
                 Button(
                     onClick = {
-                        if (email.isBlank() || !Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
-                            errorMessage = "Ingrese un correo válido (ej. usuario@gmail.com o institucional)."
+                        if (email.isBlank() || !Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches()) {
+                            errorMessage = "Ingrese un correo válido (ej. valeria.morales@iinicia.edu.mx o su Gmail)."
                             return@Button
                         }
-                        if (password.length < 6) {
-                            errorMessage = "La contraseña debe tener al menos 6 caracteres."
+                        if (password.length < 4) {
+                            errorMessage = "La contraseña debe tener al menos 4 caracteres."
                             return@Button
                         }
-                        authViewModel.login(email, password)
+                        authViewModel.login(email.trim(), password)
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(50.dp),
+                        .height(48.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = CyanBright),
                     shape = RoundedCornerShape(12.dp)
                 ) {
@@ -165,7 +168,90 @@ fun LoginScreen(
                         color = Color.White
                     )
                 }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Quick Demo Logins for Evaluator (Matches Web)
+                Text(
+                    text = "ACCESO RÁPIDO DE EVALUACIÓN",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF6B7280),
+                    letterSpacing = 1.sp
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    QuickLoginChip(
+                        role = "Estudiante",
+                        name = "Valeria Morales",
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        email = "valeria.morales@iinicia.edu.mx"
+                        password = "password123"
+                        authViewModel.login(email, password)
+                    }
+                    QuickLoginChip(
+                        role = "Coordinador",
+                        name = "Dra. Alarcón",
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        email = "sofia.alarcon@iinicia.edu.mx"
+                        password = "password123"
+                        authViewModel.login(email, password)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    QuickLoginChip(
+                        role = "Aspirante",
+                        name = "Diego Solís",
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        email = "diego.solis@gmail.com"
+                        password = "password123"
+                        authViewModel.login(email, password)
+                    }
+                    QuickLoginChip(
+                        role = "Admin TI",
+                        name = "Ing. Roberto Peña",
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        email = "admin.sistemas@iinicia.edu.mx"
+                        password = "password123"
+                        authViewModel.login(email, password)
+                    }
+                }
             }
+        }
+    }
+}
+
+@Composable
+fun QuickLoginChip(
+    role: String,
+    name: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = modifier
+            .background(Color(0xFF1E293B), RoundedCornerShape(10.dp))
+            .clickable { onClick() }
+            .padding(vertical = 8.dp, horizontal = 10.dp)
+    ) {
+        Column {
+            Text(text = role, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = CyanAccent)
+            Text(text = name, fontSize = 9.sp, color = Color(0xFF94A3B8), maxLines = 1)
         }
     }
 }

@@ -37,6 +37,40 @@ class SecureTokenManager(context: Context) {
         }
     }
 
+    fun saveUser(user: UserDto) {
+        try {
+            sharedPreferences.edit()
+                .putString("user_id", user.id)
+                .putString("user_name", user.name)
+                .putString("user_email", user.email)
+                .putString("user_role", user.role)
+                .putString("user_moodle_id", user.moodleId)
+                .putString("user_program", user.programName ?: "")
+                .apply()
+        } catch (_: Exception) {}
+    }
+
+    fun getUser(): UserDto? {
+        return try {
+            val email = sharedPreferences.getString("user_email", null) ?: return null
+            val id = sharedPreferences.getString("user_id", email) ?: email
+            val name = sharedPreferences.getString("user_name", "Usuario IINICIA") ?: "Usuario IINICIA"
+            val role = sharedPreferences.getString("user_role", "Estudiante") ?: "Estudiante"
+            val moodleId = sharedPreferences.getString("user_moodle_id", "MOODLE-01") ?: "MOODLE-01"
+            val program = sharedPreferences.getString("user_program", null)
+            UserDto(
+                id = id,
+                name = name,
+                email = email,
+                role = role,
+                moodleId = moodleId,
+                programName = program
+            )
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     fun saveUserRole(role: String) {
         try {
             sharedPreferences.edit().putString("user_role", role).apply()

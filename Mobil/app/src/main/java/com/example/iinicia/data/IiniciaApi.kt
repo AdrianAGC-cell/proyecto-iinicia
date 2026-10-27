@@ -33,16 +33,33 @@ interface IiniciaApi {
     ): Response<SupabaseAuthResponse>
 
     // Supabase REST endpoints
-    @GET("rest/v1/cursos")
-    suspend fun getCursosSupabase(
-        @Header("apikey") apiKey: String,
-        @Header("Authorization") auth: String
-    ): Response<List<CourseDto>>
-
-    @GET("rest/v1/usuarios")
-    suspend fun getUsuariosSupabase(
+    @GET("rest/v1/courses")
+    suspend fun getCoursesSupabase(
         @Header("apikey") apiKey: String,
         @Header("Authorization") auth: String,
-        @Query("email") emailQuery: String
+        @Query("select") select: String = "*"
+    ): Response<List<CourseDto>>
+
+    @GET("rest/v1/users")
+    suspend fun getUsersSupabase(
+        @Header("apikey") apiKey: String,
+        @Header("Authorization") auth: String,
+        @Query("email") emailQuery: String,
+        @Query("select") select: String = "*"
     ): Response<List<UserDto>>
+
+    @GET("rest/v1/admission_applications")
+    suspend fun getApplicationsSupabase(
+        @Header("apikey") apiKey: String,
+        @Header("Authorization") auth: String,
+        @Query("email") emailQuery: String,
+        @Query("select") select: String = "*"
+    ): Response<List<AdmissionApplicationDto>>
+
+    @GET("rest/v1/notifications")
+    suspend fun getNotificationsSupabase(
+        @Header("apikey") apiKey: String,
+        @Header("Authorization") auth: String,
+        @Query("select") select: String = "*"
+    ): Response<List<NotificationDto>>
 }

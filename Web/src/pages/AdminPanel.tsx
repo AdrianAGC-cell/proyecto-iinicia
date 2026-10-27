@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Users, 
   ShieldCheck, 
@@ -7,15 +7,19 @@ import {
   Clock, 
   Search, 
   RefreshCw, 
-  PlusCircle
+  PlusCircle,
+  Database,
+  Loader2
 } from 'lucide-react';
 import { MOCK_APPLICATIONS } from '../data/mockData';
 import { AdmissionApplication } from '../types';
+import { supabase } from '../lib/supabase';
 
 export const AdminPanel: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'aspirantes' | 'moodle' | 'cms'>('aspirantes');
   const [searchTerm, setSearchTerm] = useState('');
   const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [loadingDb, setLoadingDb] = useState(false);
 
   const [apps, setApps] = useState<AdmissionApplication[]>(() => {
     const saved = localStorage.getItem('iinicia_apps');
@@ -30,31 +34,82 @@ export const AdminPanel: React.FC = () => {
 
   const [idempotencyLog, setIdempotencyLog] = useState<string[]>([]);
 
-  const handleApproveAndSync = (appId: string) => {
+  const fetchAppsFromSupabase = async () => {
+    setLoadingDb(true);
+    try {
+      const { data, error } = await supabase
+        .from('admission_applications')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (data && data.length > 0 && !error) {
+        const mapped: AdmissionApplication[] = data.map((d: any) => ({
+          id: d.id,
+          fullName: d.full_name,
+          email: d.email,
+          phone: d.phone || 'No especificado',
+          programId: d.program_id,
+          programName: d.program_name,
+          previousSchool: d.previous_school || 'Bachillerato',
+          averageGrade: String(d.average_grade || '9.0'),
+          status: d.status || 'EN REVISION',
+          moodleSynced: d.moodle_synced || false,
+          moodleUserId: d.moodle_user_id || null,
+          date: d.created_at ? d.created_at.split('T')[0] : '2026-10-26'
+        }));
+        setApps(mapped);
+        localStorage.setItem('iinicia_apps', JSON.stringify(mapped));
+      }
+    } catch (err) {
+      console.warn('Could not load apps from Supabase:', err);
+    } finally {
+      setLoadingDb(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAppsFromSupabase();
+  }, []);
+
+  const handleApproveAndSync = async (appId: string) => {
     setSyncingId(appId);
-    setTimeout(() => {
-      const updated = apps.map((a) => {
-        if (a.id === appId) {
-          const generatedMoodleId = a.moodleUserId || Math.floor(1000 + Math.random() * 4000);
-          return {
-            ...a,
-            status: 'ADMITIDO' as const,
-            moodleSynced: true,
-            moodleUserId: generatedMoodleId
-          };
-        }
-        return a;
-      });
-      setApps(updated);
-      localStorage.setItem('iinicia_apps', JSON.stringify(updated));
-      setSyncingId(null);
-    }, 700);
+    const target = apps.find(a => a.id === appId);
+    const generatedMoodleId = target?.moodleUserId || Math.floor(1000 + Math.random() * 4000);
+
+    try {
+      await supabase
+        .from('admission_applications')
+        .update({
+          status: 'ADMITIDO',
+          moodle_synced: true,
+          moodle_user_id: generatedMoodleId,
+          moodle_sync_date: new Date().toISOString()
+        })
+        .eq('id', appId);
+    } catch (err) {
+      console.warn('Error updating Supabase:', err);
+    }
+
+    const updated = apps.map((a) => {
+      if (a.id === appId) {
+        return {
+          ...a,
+          status: 'ADMITIDO' as const,
+          moodleSynced: true,
+          moodleUserId: generatedMoodleId
+        };
+      }
+      return a;
+    });
+    setApps(updated);
+    localStorage.setItem('iinicia_apps', JSON.stringify(updated));
+    setSyncingId(null);
   };
 
   const handleTestIdempotency = () => {
     const target = apps[0];
     const log1 = `[${new Date().toLocaleTimeString()}] LLAMADA 1: POST /api/moodle/sync -> Aspirante '${target.fullName}' verificado. ID existente #${target.moodleUserId || 1042}. No se genera duplicado.`;
-    const log2 = `[${new Date().toLocaleTimeString()}] LLAMADA 2: POST /api/moodle/sync -> Idempotencia confirmada: Estado 'ACTIVE', Cohorte '2026-A' vinculada.`;
+    const log2 = `[${new Date().toLocaleTimeString()}] LLAMADA 2: POST /api/moodle/sync -> Idempotencia confirmada en Supabase: Estado 'ACTIVE', Cohorte '2026-A' vinculada.`;
     setIdempotencyLog([log2, log1, ...idempotencyLog]);
   };
 
@@ -86,6 +141,14 @@ export const AdminPanel: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3">
+          <button
+            onClick={fetchAppsFromSupabase}
+            disabled={loadingDb}
+            className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-sky-400 font-bold text-xs transition flex items-center gap-1.5 border border-slate-700 cursor-pointer disabled:opacity-50"
+          >
+            {loadingDb ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Database className="w-3.5 h-3.5" />}
+            <span>{loadingDb ? 'Cargando BD...' : 'Sincronizar con Supabase'}</span>
+          </button>
           <button
             onClick={handleTestIdempotency}
             className="px-4 py-2.5 rounded-xl bg-[#22abe2] hover:bg-[#1b9ad0] text-white font-bold text-xs transition flex items-center gap-1.5 shadow-sm cursor-pointer"

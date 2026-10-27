@@ -86,10 +86,10 @@ fun DashboardScreen(
                     onMoodleSsoClick = onMoodleSsoClick
                 )
                 RoleSimulationBar(
-                    currentRole = currentRole,
+                    currentRole = user.role,
                     onRoleSelected = { role ->
                         currentRole = role
-                        dashboardViewModel.loadData()
+                        dashboardViewModel.switchRole(role)
                     }
                 )
             }

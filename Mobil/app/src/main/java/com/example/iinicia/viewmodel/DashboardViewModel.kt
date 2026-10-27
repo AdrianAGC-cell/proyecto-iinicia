@@ -49,6 +49,14 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    fun switchRole(newRole: String) {
+        val current = _user.value
+        val updated = current.copy(role = newRole)
+        _user.value = updated
+        repository.getTokenManager().saveUserRole(newRole)
+        repository.getTokenManager().saveUser(updated)
+    }
+
     fun selectCourse(courseId: String) {
         viewModelScope.launch {
             try {
