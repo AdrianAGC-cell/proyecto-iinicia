@@ -18,14 +18,16 @@ import {
 } from 'lucide-react';
 import { MOCK_PROGRAMS } from '../data/mockData';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../context/AuthContext';
 
 export const Admisiones: React.FC = () => {
   const [searchParams] = useSearchParams();
   const defaultProg = searchParams.get('program') || 'lic-ia-datos';
+  const { user } = useAuth();
 
   const [formData, setFormData] = useState({
-    fullName: '',
-    email: '',
+    fullName: user?.name || '',
+    email: user?.email || '',
     phone: '',
     programId: defaultProg,
     previousSchool: '',
@@ -34,8 +36,25 @@ export const Admisiones: React.FC = () => {
   });
 
   const [submitting, setSubmitting] = useState(false);
-  const [submittedFolio, setSubmittedFolio] = useState<string | null>(null);
+  const [submittedFolio, setSubmittedFolio] = useState<string | null>(() => {
+    return searchParams.get('folio') || null;
+  });
   const [openFaq, setOpenFaq] = useState<number | null>(0);
+
+  // Sync user info if user changes or folio in URL
+  React.useEffect(() => {
+    if (user) {
+      setFormData(prev => ({
+        ...prev,
+        fullName: prev.fullName || user.name || '',
+        email: prev.email || user.email || ''
+      }));
+    }
+    const paramFolio = searchParams.get('folio');
+    if (paramFolio) {
+      setSubmittedFolio(paramFolio);
+    }
+  }, [user, searchParams]);
 
   // Live Supabase Lookup State
   const [lookupQuery, setLookupQuery] = useState('');
@@ -244,8 +263,8 @@ export const Admisiones: React.FC = () => {
               <div className="p-4 bg-white rounded-2xl border border-slate-200 inline-block text-left text-xs font-mono shadow-xs">
                 <p className="text-slate-400">Folio de Aspirante:</p>
                 <p className="text-lg font-bold text-[#22abe2]">{submittedFolio}</p>
-                <p className="text-slate-500 mt-1">Aspirante: <span className="text-slate-900 font-semibold">{formData.fullName}</span></p>
-                <p className="text-slate-500">Correo: <span className="text-slate-900 font-semibold">{formData.email}</span></p>
+                <p className="text-slate-500 mt-1">Aspirante: <span className="text-slate-900 font-semibold">{formData.fullName || user?.name || 'Aspirante'}</span></p>
+                <p className="text-slate-500">Correo: <span className="text-slate-900 font-semibold">{formData.email || user?.email || ''}</span></p>
               </div>
               <p className="text-xs text-slate-600 max-w-md mx-auto">
                 Un asesor académico evaluará tu promedio ({formData.averageGrade}) y te notificará por correo. También puedes ver esta solicitud reflejada en el Panel de Administración.

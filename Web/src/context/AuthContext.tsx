@@ -7,7 +7,7 @@ interface AuthContextType {
   user: User | null;
   role: Role;
   isAuthenticated: boolean;
-  login: (email: string, role?: Role, password?: string) => Promise<boolean>;
+  login: (email: string, role?: Role, password?: string, customName?: string) => Promise<boolean>;
   logout: () => void;
   switchRole: (newRole: Role) => void;
   ssoModalOpen: boolean;
@@ -19,17 +19,17 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Restore saved user or default to estudiante
+  // Restore saved user or default to null
   const [user, setUser] = useState<User | null>(() => {
     const saved = localStorage.getItem('iinicia_user');
     if (saved) {
       try {
         return JSON.parse(saved);
       } catch (e) {
-        return DEMO_USERS.estudiante;
+        return null;
       }
     }
-    return DEMO_USERS.estudiante;
+    return null;
   });
 
   const [ssoModalOpen, setSsoModalOpen] = useState(false);
@@ -43,7 +43,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [user]);
 
-  const login = async (email: string, roleParam?: Role, _password?: string): Promise<boolean> => {
+  // Escuchar eventos de confirmación de Supabase Auth (ej. clic en el correo)
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user && (event === 'SIGNED_IN' || event === 'USER_UPDATED')) {
+        const userEmail = session.user.email;
+        const metadata = session.user.user_metadata || {};
+        const userName = metadata.full_name || userEmail?.split('@')[0] || 'Aspirante';
+        if (userEmail) {
+          login(userEmail, 'aspirante', undefined, userName);
+        }
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const login = async (
+    email: string,
+    roleParam?: Role,
+    _password?: string,
+    customName?: string
+  ): Promise<boolean> => {
     const cleanEmail = (email || '').trim().toLowerCase();
 
     // 1. Check Supabase 'users' table
@@ -69,14 +92,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         const dbUser: User = {
           id: data.id,
-          name: data.full_name || cleanEmail.split('@')[0],
+          name: data.full_name || customName || cleanEmail.split('@')[0],
           email: data.email,
           role: mappedRole,
           matricula: data.matricula || undefined,
           programId: data.program_id || undefined,
           programName: data.program_name || undefined,
           semester: data.current_semester || undefined,
-          avatar: data.avatar_url || undefined,
+          avatar: data.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
           moodleId: 1042
         };
 
@@ -105,7 +128,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         const applicantUser: User = {
           id: appData.id,
-          name: appData.full_name,
+          name: appData.full_name || customName || cleanEmail.split('@')[0],
           email: appData.email,
           role: mappedRole,
           matricula,
@@ -123,26 +146,60 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.warn('[Supabase AuthContext] Applications query error:', err);
     }
 
-    // 3. Fallback persona for testing
-    const roleKey =
-      roleParam ||
-      (cleanEmail.includes('admin')
-        ? 'admin'
-        : cleanEmail.includes('coord')
-        ? 'coordinador'
-        : cleanEmail.includes('prof')
-        ? 'profesor'
-        : cleanEmail.includes('asp') || cleanEmail.includes('solis')
-        ? 'aspirante'
-        : 'estudiante');
+    // 3. Fallback persona (when offline or demo)
+    const isExplicitDemo = cleanEmail in {
+      'valeria.morales@iinicia.edu.mx': 1,
+      'diego.solis@gmail.com': 1,
+      'alejandro.mendez@iinicia.edu.mx': 1,
+      'sofia.alarcon@iinicia.edu.mx': 1,
+      'admin.sistemas@iinicia.edu.mx': 1
+    };
 
-    const fallbackUser = DEMO_USERS[roleKey] || DEMO_USERS.estudiante;
-    setUser({ ...fallbackUser, email: cleanEmail || fallbackUser.email });
+    if (isExplicitDemo) {
+      const roleKey =
+        roleParam ||
+        (cleanEmail.includes('admin')
+          ? 'admin'
+          : cleanEmail.includes('coord')
+          ? 'coordinador'
+          : cleanEmail.includes('prof')
+          ? 'profesor'
+          : cleanEmail.includes('solis')
+          ? 'aspirante'
+          : 'estudiante');
+      const fallbackUser = DEMO_USERS[roleKey] || DEMO_USERS.estudiante;
+      setUser({ ...fallbackUser, email: cleanEmail });
+      return true;
+    }
+
+    // New user with their real name
+    const resolvedName =
+      customName ||
+      (cleanEmail
+        ? cleanEmail
+            .split('@')[0]
+            .split(/[._-]/)
+            .filter(Boolean)
+            .map((p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase())
+            .join(' ')
+        : 'Usuario');
+
+    const dynamicRole: Role = roleParam || 'aspirante';
+    const newUser: User = {
+      id: `USR-${Date.now().toString().slice(-6)}`,
+      name: resolvedName,
+      email: cleanEmail,
+      role: dynamicRole,
+      programName: 'Licenciatura en Inteligencia Artificial y Ciencia de Datos',
+      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80'
+    };
+    setUser(newUser);
     return true;
   };
 
   const logout = () => {
     setUser(null);
+    localStorage.removeItem('iinicia_user');
   };
 
   const switchRole = (newRole: Role) => {

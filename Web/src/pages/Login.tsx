@@ -1,19 +1,39 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Lock, Mail, ArrowRight, Loader2, Database } from 'lucide-react';
+import { Lock, Mail, ArrowRight, Loader2, Database, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Role } from '../types';
+import { supabase } from '../lib/supabase';
 
 export const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const { login } = useAuth();
   const navigate = useNavigate();
 
   const handleFormLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setErrorMessage(null);
+
+    // Validar si el usuario está registrado en Supabase Auth y tiene el correo sin confirmar
+    try {
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: password
+      });
+
+      if (authError && authError.message.toLowerCase().includes('email not confirmed')) {
+        setErrorMessage('Tu correo no ha sido confirmado. Por favor revisa tu bandeja de entrada o correo no deseado (Spam) para activarlo.');
+        setLoading(false);
+        return;
+      }
+    } catch (e) {
+      // Si falla auth, continúa al login de base de datos
+    }
+
     await login(email, undefined, password);
     setLoading(false);
     navigate('/mi-iinicia');
@@ -54,6 +74,13 @@ export const Login: React.FC = () => {
               Accede a tu portal institucional y a tus materias con la misma cuenta de la base de datos central.
             </p>
           </div>
+
+          {errorMessage && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-2xl flex items-center gap-2 text-xs text-red-700 animate-fadeIn">
+              <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
 
           <form onSubmit={handleFormLogin} className="space-y-4">
             <div>

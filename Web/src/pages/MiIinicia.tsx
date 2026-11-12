@@ -93,14 +93,14 @@ export const MiIinicia: React.FC = () => {
             <div className="space-y-1">
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-[#22abe2]/20 text-[#7dd3f1] border border-[#22abe2]/30">
-                  Estudiante Regular • {user?.semester || 4}to Semestre
+                  {user?.role === 'aspirante' ? 'Aspirante en Admisión' : `Estudiante Regular • ${user?.semester || 1}er Semestre`}
                 </span>
                 <span className="text-xs text-slate-400 font-mono">
-                  Matrícula: {user?.matricula || 'IIN-2024-8842'}
+                  {user?.role === 'aspirante' ? `Folio: ${user?.id || 'En trámite'}` : `Matrícula: ${user?.matricula || 'IIN-2026-REG'}`}
                 </span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
-                {user?.name || 'Valeria Morales Santillán'}
+                {user?.name || (user?.email ? user.email.split('@')[0] : 'Usuario')}
               </h1>
               <p className="text-xs sm:text-sm text-slate-300">
                 {user?.programName || 'Licenciatura en Inteligencia Artificial y Ciencia de Datos'}
@@ -156,22 +156,22 @@ export const MiIinicia: React.FC = () => {
       {idCardOpen && (
         <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xl max-w-xl mx-auto animate-fadeIn relative overflow-hidden">
           <div className="flex justify-between items-center border-b border-slate-100 pb-4 mb-4">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Credencial Oficial de Alumno</span>
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{user?.role === 'aspirante' ? 'Credencial Digital de Aspirante' : 'Credencial Oficial de Alumno'}</span>
             <span className="text-xs font-bold text-[#148ebf] bg-[#22abe2]/10 px-2 py-0.5 rounded">Vigencia: 2026-2027</span>
           </div>
 
           <div className="bg-[#05080f] p-6 rounded-2xl text-white flex flex-col sm:flex-row items-center gap-6 shadow-inner border border-slate-800">
             <SafeImage
               src={user?.avatar}
-              alt={user?.name || 'Estudiante'}
+              alt={user?.name || 'Aspirante'}
               isAvatar={true}
               className="w-24 h-24 rounded-2xl object-cover ring-2 ring-[#22abe2]"
             />
             <div className="space-y-1 text-center sm:text-left">
               <img src="/logo-iinicia-white.png" alt="I²NICIA" className="h-8 w-auto mb-1 mx-auto sm:mx-0" />
               <h4 className="text-base font-black">{user?.name}</h4>
-              <p className="text-xs text-[#22abe2] font-mono">Matrícula: {user?.matricula || 'IIN-2024-8842'}</p>
-              <p className="text-xs text-slate-300">{user?.programName}</p>
+              <p className="text-xs text-[#22abe2] font-mono">{user?.role === 'aspirante' ? `Folio: ${user?.id || 'En trámite'}` : `Matrícula: ${user?.matricula || 'IIN-2026-REG'}`}</p>
+              <p className="text-xs text-slate-300">{user?.programName || 'Programa Académico I²NICIA'}</p>
               <div className="pt-2 text-[10px] text-slate-400">
                 Código QR de Validación Institucional (SEP / RVOE)
               </div>
