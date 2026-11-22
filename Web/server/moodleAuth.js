@@ -106,12 +106,44 @@ export async function autenticarMoodle(identificador, password, tipo) {
         throw new Error('No se pudo consultar el perfil');
     }
 
+    let email = '';
+    let matricula = '';
+
+    try {
+        const consultaUsuario = await fetch(
+            new URL('/webservice/rest/server.php', moodleUrl),
+            {
+                method: 'POST',
+                body: new URLSearchParams({
+                    wstoken: moodleToken,
+                    wsfunction: 'core_user_get_users_by_field',
+                    moodlewsrestformat: 'json',
+                    field: 'id',
+                    'values[0]': String(perfil.userid)
+                }),
+                signal: AbortSignal.timeout(5000)
+            }
+        );
+
+        if (consultaUsuario.ok) {
+            const usuarios = await consultaUsuario.json();
+            if (Array.isArray(usuarios) && usuarios.length > 0) {
+                email = usuarios[0].email || '';
+                matricula = usuarios[0].idnumber || '';
+            }
+        }
+    } catch (_) {
+        // En caso de que falle la consulta de detalle, continuar con los datos del perfil
+    }
+
     return {
         usuario: {
             id: perfil.userid,
             username: perfil.username,
             nombre: perfil.fullname,
-            imagen: perfil.userpictureurl
+            imagen: perfil.userpictureurl,
+            email: email || (tipo === 'correo' ? identificador : ''),
+            matricula: matricula || (tipo === 'matricula' ? identificador : '')
         },
         token: datos.token
     };

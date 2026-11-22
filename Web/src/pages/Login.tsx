@@ -78,13 +78,12 @@ export const Login: React.FC = () => {
                 <label className="block text-xs font-bold text-slate-700 uppercase">
                   Contraseña
                 </label>
-                <a 
-                  href="#recuperar" 
-                  onClick={() => alert('Se ha enviado un enlace de restablecimiento seguro a tu correo institucional.')} 
+                <Link 
+                  to="/recuperar-password" 
                   className="text-[11px] text-[#22abe2] hover:underline"
                 >
                   ¿Olvidaste tu contraseña?
-                </a>
+                </Link>
               </div>
               <div className="relative">
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />

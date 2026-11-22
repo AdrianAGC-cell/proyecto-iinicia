@@ -16,6 +16,9 @@ import { Registro } from './pages/Registro';
 import { MiIinicia } from './pages/MiIinicia';
 import { AdminPanel } from './pages/AdminPanel';
 import { MoodlePreview } from './pages/MoodlePreview';
+import { AvisoPrivacidad } from './pages/AvisoPrivacidad';
+import { TerminosServicio } from './pages/TerminosServicio';
+import { RecuperarPassword } from './pages/RecuperarPassword';
 
 // Helper component to scroll to top on page change
 const ScrollToTop: React.FC = () => {
@@ -47,6 +50,9 @@ export const App: React.FC = () => {
               <Route path="/mi-iinicia" element={<MiIinicia />} />
               <Route path="/admin" element={<AdminPanel />} />
               <Route path="/moodle-preview" element={<MoodlePreview />} />
+              <Route path="/recuperar-password" element={<RecuperarPassword />} />
+              <Route path="/aviso-privacidad" element={<AvisoPrivacidad />} />
+              <Route path="/terminos-servicio" element={<TerminosServicio />} />
             </Routes>
           </main>
           <Footer />

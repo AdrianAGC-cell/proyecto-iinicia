@@ -44,14 +44,19 @@ interface IiniciaApi {
     @GET("api/notifications")
     suspend fun getNotifications(): Response<List<NotificationDto>>
 
-    // Backend propio: cursos y contenidos reales de Moodle
-    @GET("api/moodle/courses")
+    // Backend propio: cursos y contenidos reales autenticados de Moodle
+    @GET("api/auth/courses")
     suspend fun getMoodleCourses(): Response<MoodleCoursesResponse>
 
-    @GET("api/moodle/courses/{id}/contents")
+    @GET("api/auth/courses/{id}/contents")
     suspend fun getMoodleCourseContents(
         @Path("id") courseId: Long
     ): Response<MoodleContentsResponse>
+
+    @GET("api/auth/courses/{id}/grades")
+    suspend fun getMoodleCourseGrades(
+        @Path("id") courseId: Long
+    ): Response<MoodleGradesResponse>
 
     // Supabase Auth endpoint
     @POST("auth/v1/token")

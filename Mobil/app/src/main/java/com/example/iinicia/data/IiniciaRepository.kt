@@ -184,9 +184,9 @@ class IiniciaRepository(context: Context) {
             val user = UserDto(
                 id = usuario.id.toString(),
                 name = usuario.nombre,
-                email = if (tipo == "correo") identificador else "",
+                email = usuario.email?.ifBlank { if (tipo == "correo") identificador else "" } ?: (if (tipo == "correo") identificador else ""),
                 role = "Estudiante",
-                moodleId = usuario.id.toString()
+                moodleId = usuario.matricula?.ifBlank { usuario.id.toString() } ?: usuario.id.toString()
             )
 
             Result.success(
@@ -218,8 +218,9 @@ class IiniciaRepository(context: Context) {
                     UserDto(
                         id = usuario.id.toString(),
                         name = usuario.nombre,
+                        email = usuario.email ?: "",
                         role = "Estudiante",
-                        moodleId = usuario.id.toString()
+                        moodleId = usuario.matricula?.ifBlank { usuario.id.toString() } ?: usuario.id.toString()
                     )
                 )
             } else {
@@ -249,6 +250,17 @@ class IiniciaRepository(context: Context) {
     ): Result<java.io.File> =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             try {
+                // Limpiar archivos temporales antiguos en la carpeta de destino
+                destino.parentFile?.let { dir ->
+                    if (dir.exists()) {
+                        dir.listFiles()?.forEach { file ->
+                            if (file.isFile && file.name != destino.name && file.name.endsWith(".pdf")) {
+                                file.delete()
+                            }
+                        }
+                    }
+                }
+
                 val response = moodleApi.descargarPdf(
                     courseId,
                     moduleId
@@ -312,7 +324,7 @@ class IiniciaRepository(context: Context) {
                             description = curso.resumen
                                 .replace(Regex("<[^>]*>"), " ")
                                 .trim(),
-                            progress = 0f,
+                            progress = (curso.progress ?: 0f) / 100f,
                             instructor = "Curso de Moodle",
                             semester = curso.nombreCorto.trim(),
                             tasks = emptyList()
@@ -332,19 +344,39 @@ class IiniciaRepository(context: Context) {
 
     suspend fun getCourseDetail(courseId: String): Result<CourseDto> {
         val baseCourse = getCourses().getOrNull()?.find { it.id == courseId }
-        if (baseCourse != null && courseId.toLongOrNull() != null) {
+        val cidLong = courseId.toLongOrNull()
+        if (baseCourse != null && cidLong != null) {
             return try {
-                val response = moodleApi.getMoodleCourseContents(courseId.toLong())
+                val response = moodleApi.getMoodleCourseContents(cidLong)
                 val payload = response.body()
                 if (response.isSuccessful && payload?.conectado == true) {
+                    // Consultar calificaciones reales de Moodle
+                    val gradesMap = mutableMapOf<String, String>()
+                    try {
+                        val gradesResponse = moodleApi.getMoodleCourseGrades(cidLong)
+                        val gradesBody = gradesResponse.body()
+                        if (gradesResponse.isSuccessful && gradesBody?.success == true) {
+                            gradesBody.usergrades.firstOrNull()?.gradeitems?.forEach { item ->
+                                val name = item.itemname?.trim()?.lowercase()
+                                val gradeText = item.gradeformatted?.trim()
+                                if (!name.isNullOrBlank() && !gradeText.isNullOrBlank() && gradeText != "-") {
+                                    gradesMap[name] = gradeText
+                                }
+                            }
+                        }
+                    } catch (_: Exception) {}
+
                     val tasks = payload.secciones.flatMap { seccion ->
                         seccion.actividades.map { actividad ->
+                            val activityName = actividad.nombre.trim().lowercase()
+                            val matchedGrade = gradesMap[activityName]
                             MoodleTaskDto(
                                 id = actividad.id.toString(),
                                 courseId = courseId,
                                 title = "${seccion.nombre}: ${actividad.nombre}",
                                 dueDate = actividad.tipo,
-                                status = if (actividad.visible == 1) "Disponible" else "Oculta"
+                                status = if (actividad.visible == 1) "Disponible" else "Oculta",
+                                grade = matchedGrade
                             )
                         }
                     }

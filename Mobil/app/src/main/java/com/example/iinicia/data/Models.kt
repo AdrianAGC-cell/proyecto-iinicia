@@ -87,7 +87,8 @@ data class MoodleCourseItem(
     val nombreCorto: String = "",
     val idCategoria: Int = 0,
     val visible: Int = 1,
-    val resumen: String = ""
+    val resumen: String = "",
+    val progress: Float? = null
 )
 
 data class MoodleContentsResponse(
@@ -106,13 +107,20 @@ data class MoodleSectionItem(
     val actividades: List<MoodleActivityItem> = emptyList()
 )
 
+data class MoodleContentFile(
+    val filename: String = "",
+    val filesize: Long = 0,
+    val mimetype: String = ""
+)
+
 data class MoodleActivityItem(
     val id: Long = 0,
     val nombre: String = "",
     val tipo: String = "",
     val url: String? = null,
     val visible: Int = 1,
-    val descripcion: String = ""
+    val descripcion: String = "",
+    val contents: List<MoodleContentFile> = emptyList()
 )
 
 data class MoodleLoginRequest(
@@ -132,5 +140,32 @@ data class MoodleUserProfile(
     val id: Long = 0,
     val username: String = "",
     val nombre: String = "",
-    val imagen: String? = null
+    val imagen: String? = null,
+    val email: String? = null,
+    val matricula: String? = null
+)
+
+data class MoodleGradesResponse(
+    val success: Boolean = false,
+    val usergrades: List<MoodleUserGradeItem> = emptyList(),
+    val error: String? = null
+)
+
+data class MoodleUserGradeItem(
+    val courseid: Long = 0,
+    val userid: Long = 0,
+    val gradeitems: List<MoodleGradeDetail> = emptyList()
+)
+
+data class MoodleGradeDetail(
+    val id: Long = 0,
+    val itemname: String? = null,
+    val itemtype: String? = null,
+    val itemmodule: String? = null,
+    val iteminstance: Long? = null,
+    val graderaw: Float? = null,
+    val grademin: Float? = null,
+    val grademax: Float? = null,
+    val gradeformatted: String? = null,
+    val percentageformatted: String? = null
 )

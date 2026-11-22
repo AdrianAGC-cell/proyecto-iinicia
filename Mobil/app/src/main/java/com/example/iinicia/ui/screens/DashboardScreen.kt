@@ -73,6 +73,8 @@ fun DashboardScreen(
     val user by dashboardViewModel.user.collectAsState()
     val courses by dashboardViewModel.courses.collectAsState()
     val notifications by dashboardViewModel.notifications.collectAsState()
+    val isOfflineMode by dashboardViewModel.isOfflineMode.collectAsState()
+    val isLoading by dashboardViewModel.isLoading.collectAsState()
 
     var searchQuery by remember { mutableStateOf("") }
     var currentRole by remember { mutableStateOf(user.role) }
@@ -84,13 +86,6 @@ fun DashboardScreen(
                     userName = user.name,
                     onProfileClick = onProfileClick,
                     onMoodleSsoClick = onMoodleSsoClick
-                )
-                RoleSimulationBar(
-                    currentRole = user.role,
-                    onRoleSelected = { role ->
-                        currentRole = role
-                        dashboardViewModel.switchRole(role)
-                    }
                 )
             }
         },
@@ -263,22 +258,45 @@ fun DashboardScreen(
                             .fillMaxWidth()
                             .padding(20.dp)
                     ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Panel Académico • $currentRole",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = CyanAccent
+                            )
+
+                            // Status Pill
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(if (isOfflineMode) Color(0xFFF59E0B).copy(alpha = 0.2f) else Color(0xFF10B981).copy(alpha = 0.2f))
+                                    .border(1.dp, if (isOfflineMode) Color(0xFFF59E0B) else Color(0xFF10B981), RoundedCornerShape(12.dp))
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = if (isOfflineMode) "⚡ Modo Local" else "🟢 Moodle Online",
+                                    color = if (isOfflineMode) Color(0xFFF59E0B) else Color(0xFF10B981),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Panel Académico • $currentRole",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = CyanAccent
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = "${user.name} (${user.email})",
+                            text = "${user.name.ifBlank { "Estudiante IINICIA" }} (${user.email.ifBlank { "institucional@iinicia.edu.mx" }})",
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = TextWhite
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "Moodle ID (SSO): ${user.moodleId}",
+                            text = "Matrícula / ID Moodle: ${user.moodleId.ifBlank { "IIN-2026-0001" }}",
                             fontSize = 12.sp,
                             color = TextMuted
                         )
@@ -299,18 +317,129 @@ fun DashboardScreen(
                 }
             }
 
-            // 3. Section Header: Active Courses
+            // 3. Próximas Actividades y Fechas Importantes (Alcance Sección 9.1)
             item {
-                Text(
-                    text = "Cursos Activos y Autorizados",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextWhite
-                )
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = CardBackgroundDark),
+                    border = BorderStroke(1.dp, CardBorderDark)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Próximas Actividades & Fechas",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextWhite
+                            )
+                            Text(
+                                text = "LMS Sync",
+                                fontSize = 11.sp,
+                                color = CyanAccent,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+
+                        // Deadline Item 1
+                        DeadlineRow(
+                            courseCode = "IA-404: Optimización Numérica",
+                            taskTitle = "Entrega Práctica: Algoritmos Genéticos",
+                            dueDate = "Hoy, 23:59 hrs",
+                            isUrgent = true,
+                            onClick = {
+                                val c = courses.firstOrNull()
+                                if (c != null) onCourseClick(c.id)
+                            }
+                        )
+
+                        // Deadline Item 2
+                        DeadlineRow(
+                            courseCode = "IA-401: Deep Learning",
+                            taskTitle = "Laboratorio: Modelos Convolucionales PyTorch",
+                            dueDate = "28 Octubre, 23:59 hrs",
+                            isUrgent = false,
+                            onClick = {
+                                val c = courses.firstOrNull()
+                                if (c != null) onCourseClick(c.id)
+                            }
+                        )
+
+                        // Deadline Item 3
+                        DeadlineRow(
+                            courseCode = "IA-402: Cloud & MLOps",
+                            taskTitle = "Deploy de Pods con Autoscaling en GCP",
+                            dueDate = "29 Octubre, 18:00 hrs",
+                            isUrgent = false,
+                            onClick = {
+                                val c = courses.getOrNull(1) ?: courses.firstOrNull()
+                                if (c != null) onCourseClick(c.id)
+                            }
+                        )
+                    }
+                }
             }
 
-            // 4. Courses List
-            items(courses) { course ->
+            // 4. Section Header: Active Courses
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Cursos Activos y Autorizados (${courses.size})",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextWhite
+                    )
+                    if (isLoading) {
+                        Text(
+                            text = "Actualizando...",
+                            fontSize = 12.sp,
+                            color = CyanAccent
+                        )
+                    }
+                }
+            }
+
+            // 5. Courses List
+            val displayedCourses = if (searchQuery.isBlank()) {
+                courses
+            } else {
+                courses.filter {
+                    it.title.contains(searchQuery, ignoreCase = true) ||
+                    it.description.contains(searchQuery, ignoreCase = true)
+                }
+            }
+
+            if (displayedCourses.isEmpty()) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (searchQuery.isNotBlank()) "No se encontraron cursos para '$searchQuery'" else "No hay cursos autorizados asignados",
+                            color = TextMuted,
+                            fontSize = 14.sp
+                        )
+                    }
+                }
+            }
+
+            items(displayedCourses) { course ->
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -361,6 +490,69 @@ fun DashboardScreen(
                             )
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun DeadlineRow(
+    courseCode: String,
+    taskTitle: String,
+    dueDate: String,
+    isUrgent: Boolean,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+        border = BorderStroke(1.dp, if (isUrgent) Color(0xFFEF4444).copy(alpha = 0.5f) else CardBorderDark)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = courseCode,
+                    color = CyanAccent,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = taskTitle,
+                    color = TextWhite,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "Vence: $dueDate",
+                    color = if (isUrgent) Color(0xFFEF4444) else TextMuted,
+                    fontSize = 11.sp,
+                    fontWeight = if (isUrgent) FontWeight.Bold else FontWeight.Normal
+                )
+            }
+            if (isUrgent) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(0xFFEF4444).copy(alpha = 0.2f))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = "Hoy",
+                        color = Color(0xFFEF4444),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
         }

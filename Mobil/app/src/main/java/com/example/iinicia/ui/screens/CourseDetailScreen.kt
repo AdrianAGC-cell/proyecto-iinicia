@@ -78,6 +78,10 @@ fun CourseDetailScreen(
         mutableStateOf(false)
     }
 
+    var selectedActivityDialog by remember {
+        mutableStateOf<com.example.iinicia.data.MoodleTaskDto?>(null)
+    }
+
 
     LaunchedEffect(courseId) {
         viewModel.selectCourse(courseId)
@@ -167,77 +171,77 @@ fun CourseDetailScreen(
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable(
-                                enabled = !descargando &&
-                                    task.dueDate == "resource" &&
-                                    task.status == "Disponible"
-                            ) {
-                                val cid = courseId.toLongOrNull()
-                                val mid = task.id.toLongOrNull()
+                            .clickable(enabled = !descargando) {
+                                if (task.dueDate == "resource" && task.status == "Disponible") {
+                                    val cid = courseId.toLongOrNull()
+                                    val mid = task.id.toLongOrNull()
 
-                                if (cid != null && mid != null) {
-                                    descargando = true
+                                    if (cid != null && mid != null) {
+                                        descargando = true
 
-                                    scope.launch {
-                                        try {
-                                            val carpeta = File(
-                                                context.cacheDir,
-                                                "moodle_pdf"
-                                            )
+                                        scope.launch {
+                                            try {
+                                                val carpeta = File(
+                                                    context.cacheDir,
+                                                    "moodle_pdf"
+                                                )
 
-                                            carpeta.mkdirs()
+                                                carpeta.mkdirs()
 
-                                            val destino = File.createTempFile(
-                                                "recurso_",
-                                                ".pdf",
-                                                carpeta
-                                            )
+                                                val destino = File.createTempFile(
+                                                    "recurso_",
+                                                    ".pdf",
+                                                    carpeta
+                                                )
 
-                                            Toast.makeText(
-                                                context,
-                                                "Descargando PDF...",
-                                                Toast.LENGTH_SHORT
-                                            ).show()
+                                                Toast.makeText(
+                                                    context,
+                                                    "Descargando PDF...",
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
 
-                                            val resultado = repository.descargarPdf(
-                                                cid,
-                                                mid,
-                                                destino
-                                            )
+                                                val resultado = repository.descargarPdf(
+                                                    cid,
+                                                    mid,
+                                                    destino
+                                                )
 
-                                            val pdf = resultado.getOrThrow()
+                                                val pdf = resultado.getOrThrow()
 
-                                            val uri = FileProvider.getUriForFile(
-                                                context,
-                                                context.packageName + ".moodlefiles",
-                                                pdf
-                                            )
+                                                val uri = FileProvider.getUriForFile(
+                                                    context,
+                                                    context.packageName + ".moodlefiles",
+                                                    pdf
+                                                )
 
-                                            val intent = Intent(Intent.ACTION_VIEW).apply {
-                                                setDataAndType(uri, "application/pdf")
-                                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                val intent = Intent(Intent.ACTION_VIEW).apply {
+                                                    setDataAndType(uri, "application/pdf")
+                                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                }
+
+                                                context.startActivity(intent)
+
+                                            } catch (e: kotlinx.coroutines.CancellationException) {
+                                                throw e
+                                            } catch (e: android.content.ActivityNotFoundException) {
+                                                Toast.makeText(
+                                                    context,
+                                                    "No tienes un visor PDF instalado",
+                                                    Toast.LENGTH_LONG
+                                                ).show()
+                                            } catch (e: Exception) {
+                                                Toast.makeText(
+                                                    context,
+                                                    "No se pudo abrir el PDF. Verifica tu sesion.",
+                                                    Toast.LENGTH_LONG
+                                                ).show()
+                                            } finally {
+                                                descargando = false
                                             }
-
-                                            context.startActivity(intent)
-
-                                        } catch (e: kotlinx.coroutines.CancellationException) {
-                                            throw e
-                                        } catch (e: android.content.ActivityNotFoundException) {
-                                            Toast.makeText(
-                                                context,
-                                                "No tienes un visor PDF instalado",
-                                                Toast.LENGTH_LONG
-                                            ).show()
-                                        } catch (e: Exception) {
-                                            Toast.makeText(
-                                                context,
-                                                "No se pudo abrir el PDF. Verifica tu sesion.",
-                                                Toast.LENGTH_LONG
-                                            ).show()
-                                        } finally {
-                                            descargando = false
                                         }
                                     }
+                                } else {
+                                    selectedActivityDialog = task
                                 }
                             },
                         shape = RoundedCornerShape(14.dp),
@@ -294,6 +298,73 @@ fun CourseDetailScreen(
                     }
                 }
             }
+        }
+
+        // Modal de interacción con actividades Moodle (Foro / Tarea / Evaluación)
+        selectedActivityDialog?.let { activity ->
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { selectedActivityDialog = null },
+                title = {
+                    Text(
+                        text = activity.title,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = NavyPrimary
+                    )
+                },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "Módulo Académico: ${activity.dueDate.uppercase()}",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = BrightBlue
+                        )
+                        Text(
+                            text = "Estado: ${activity.status}",
+                            fontSize = 13.sp,
+                            color = Color.DarkGray
+                        )
+                        activity.grade?.let { g ->
+                            Text(
+                                text = "Calificación Registrada: $g",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF10B981)
+                            )
+                        }
+                        Text(
+                            text = "Para participar en foros, entregar tareas o contestar cuestionarios con tu identidad única institucional, accede al Campus Virtual mediante Single Sign-On.",
+                            fontSize = 12.sp,
+                            color = TextMuted
+                        )
+                    }
+                },
+                confirmButton = {
+                    androidx.compose.material3.Button(
+                        onClick = {
+                            selectedActivityDialog = null
+                            val intent = Intent(
+                                Intent.ACTION_VIEW,
+                                android.net.Uri.parse("https://moodle.iinicia.org/course/view.php?id=$courseId")
+                            )
+                            try {
+                                context.startActivity(intent)
+                            } catch (_: Exception) {
+                                Toast.makeText(context, "No se pudo abrir el navegador", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = BrightBlue)
+                    ) {
+                        Text("Abrir en Campus Virtual (SSO)", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    androidx.compose.material3.OutlinedButton(onClick = { selectedActivityDialog = null }) {
+                        Text("Cerrar", fontSize = 12.sp)
+                    }
+                }
+            )
         }
     }
 }

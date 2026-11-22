@@ -30,21 +30,50 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
-
+    private val _isOfflineMode = MutableStateFlow(false)
+    val isOfflineMode: StateFlow<Boolean> = _isOfflineMode.asStateFlow()
 
     fun loadData() {
         viewModelScope.launch {
             _isLoading.value = true
-            _user.value = UserDto()
-            _courses.value = emptyList()
-            _notifications.value = emptyList()
             _selectedCourse.value = null
             try {
-                repository.getProfile().onSuccess { _user.value = it }
-                repository.getCourses().onSuccess { _courses.value = it }
-                _notifications.value = emptyList()
+                // 1. Cargar Perfil
+                repository.getProfile().onSuccess { perfil ->
+                    _user.value = perfil
+                }.onFailure {
+                    if (_user.value.name.isBlank()) {
+                        _user.value = repository.demoUser
+                    }
+                }
+
+                // 2. Cargar Cursos
+                val cursosResultado = repository.getCourses()
+                if (cursosResultado.isSuccess && cursosResultado.getOrNull()?.isNotEmpty() == true) {
+                    _courses.value = cursosResultado.getOrNull()!!
+                    _isOfflineMode.value = false
+                } else {
+                    // Si Moodle está en otra laptop o sin conexión, mantener cursos académicos de continuidad
+                    _courses.value = repository.demoCourses
+                    _isOfflineMode.value = true
+                }
+
+                // 3. Cargar Notificaciones
+                repository.getNotifications().onSuccess { notifs ->
+                    _notifications.value = notifs
+                }.onFailure {
+                    _notifications.value = repository.demoNotifications
+                }
+
             } catch (_: Exception) {
-                // Ensure demo data remains intact on any unexpected error
+                if (_courses.value.isEmpty()) {
+                    _courses.value = repository.demoCourses
+                }
+                if (_user.value.name.isBlank()) {
+                    _user.value = repository.demoUser
+                }
+                _notifications.value = repository.demoNotifications
+                _isOfflineMode.value = true
             } finally {
                 _isLoading.value = false
             }
@@ -61,9 +90,13 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             try {
                 repository.getCourseDetail(courseId).onSuccess {
                     _selectedCourse.value = it
+                }.onFailure {
+                    val local = _courses.value.find { it.id == courseId }
+                    _selectedCourse.value = local
                 }
             } catch (_: Exception) {
-                _selectedCourse.value = null
+                val local = _courses.value.find { it.id == courseId }
+                _selectedCourse.value = local
             }
         }
     }

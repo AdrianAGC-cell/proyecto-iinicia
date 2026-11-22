@@ -1,4 +1,5 @@
 import { configurarArchivosMoodle } from './moodleFiles.js';
+import { configurarCursosMoodle } from './moodleCourses.js';
 import express from 'express';
 import cors from 'cors';
 import { createClient } from '@supabase/supabase-js';
@@ -16,12 +17,16 @@ const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://hwzkpkmithroyobnt
 const SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh3emtwa21pdGhyb3lvYm50eXBxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI2MzU2NTYsImV4cCI6MjEwODIxMTY1Nn0.ncSUUAO-jojOdTu6NzuJxf7lxFCSyg3O_02yU9n1Jt0';
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-app.use(cors());
+app.use(cors({
+  origin: true,
+  credentials: true
+}));
 app.use(express.json());
 
-// Configurar autenticacion real con Moodle
+// Configurar autenticacion y cursos reales con Moodle
 configurarAutenticacion(app);
 configurarArchivosMoodle(app);
+configurarCursosMoodle(app);
 // Consultar secciones y actividades reales de Moodle
 app.get('/api/moodle/courses/:id/contents', async (req, res) => {
   try {

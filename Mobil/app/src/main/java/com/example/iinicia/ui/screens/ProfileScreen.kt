@@ -11,7 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -94,10 +94,11 @@ fun ProfileScreen(
                     )
 
                     ProfileItem(label = "Nombre Completo", value = user.name)
-                    ProfileItem(label = "Correo Institucional", value = user.email)
+                    ProfileItem(label = "Correo Institucional", value = user.email.ifBlank { "No registrado en Moodle" })
+                    ProfileItem(label = "Programa Académico", value = user.programName ?: "Licenciatura en Inteligencia Artificial y Ciencia de Datos")
                     ProfileItem(label = "Rol Institucional", value = user.role)
-                    ProfileItem(label = "Moodle ID (SSO)", value = user.moodleId)
-                    ProfileItem(label = "Estado de Seguridad", value = "Tokens JWT Encriptados (EncryptedSharedPreferences)")
+                    ProfileItem(label = "Matrícula / ID Moodle", value = user.moodleId.ifBlank { user.id })
+                    ProfileItem(label = "Estado de Seguridad", value = "Sesión Segura / Cookie iinicia.sid (OIDC)")
                 }
             }
 
@@ -115,7 +116,7 @@ fun ProfileScreen(
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
                 shape = RoundedCornerShape(12.dp)
             ) {
-                Icon(Icons.Default.ExitToApp, contentDescription = null)
+                Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null)
                 Spacer(modifier = Modifier.padding(horizontal = 4.dp))
                 Text("Cerrar Sesión Seguro (Revocar Tokens)", fontSize = 15.sp, fontWeight = FontWeight.Bold)
             }

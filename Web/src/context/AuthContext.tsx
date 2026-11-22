@@ -46,6 +46,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, roleParam?: Role, _password?: string): Promise<boolean> => {
     const cleanEmail = (email || '').trim().toLowerCase();
 
+    // 0. Intentar inicio de sesión real con Moodle / Express
+    if (_password) {
+      try {
+        const tipo = cleanEmail.includes('@')
+          ? 'correo'
+          : cleanEmail.startsWith('iin-')
+          ? 'matricula'
+          : 'usuario';
+
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            identificador: cleanEmail,
+            password: _password,
+            tipo
+          })
+        });
+
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && json.usuario) {
+            const u = json.usuario;
+            const moodleUser: User = {
+              id: String(u.id),
+              name: u.nombre || u.username,
+              email: u.email || cleanEmail,
+              role: 'estudiante',
+              matricula: u.matricula || undefined,
+              avatar: u.imagen || undefined,
+              moodleId: Number(u.id)
+            };
+            setUser(moodleUser);
+            return true;
+          }
+        }
+      } catch (_) {
+        // Fallback a Supabase/demo si Express no está disponible
+      }
+    }
+
     // 1. Check Supabase 'users' table
     try {
       const { data, error } = await supabase
@@ -142,6 +184,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = () => {
+    try {
+      fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+    } catch (_) {}
     setUser(null);
   };
 

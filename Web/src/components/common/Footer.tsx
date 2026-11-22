@@ -130,9 +130,9 @@ export const Footer: React.FC = () => {
         <div className="pt-8 flex flex-col md:flex-row items-center justify-between text-xs text-slate-500 gap-4">
           <p>© 2026 I²NICIA - Instituto de Innovación y Ciencias Aplicadas. Todos los derechos reservados.</p>
           <div className="flex items-center space-x-6">
-            <a href="#" className="hover:text-slate-400 transition">Aviso de Privacidad</a>
-            <a href="#" className="hover:text-slate-400 transition">Términos de Servicio</a>
-            <a href="#" className="hover:text-slate-400 transition">Seguridad Digital</a>
+            <Link to="/aviso-privacidad" className="hover:text-[#22abe2] transition">Aviso de Privacidad</Link>
+            <Link to="/terminos-servicio" className="hover:text-[#22abe2] transition">Términos de Servicio</Link>
+            <Link to="/contacto" className="hover:text-[#22abe2] transition">Seguridad Digital & Soporte</Link>
           </div>
         </div>
       </div>
