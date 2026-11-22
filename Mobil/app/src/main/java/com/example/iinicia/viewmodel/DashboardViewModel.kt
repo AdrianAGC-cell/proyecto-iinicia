@@ -15,32 +15,34 @@ import kotlinx.coroutines.launch
 class DashboardViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = IiniciaRepository(application)
 
-    private val _user = MutableStateFlow<UserDto>(repository.demoUser)
+    private val _user = MutableStateFlow<UserDto>(UserDto())
     val user: StateFlow<UserDto> = _user.asStateFlow()
 
-    private val _courses = MutableStateFlow<List<CourseDto>>(repository.demoCourses)
+    private val _courses = MutableStateFlow<List<CourseDto>>(emptyList())
     val courses: StateFlow<List<CourseDto>> = _courses.asStateFlow()
 
     private val _selectedCourse = MutableStateFlow<CourseDto?>(null)
     val selectedCourse: StateFlow<CourseDto?> = _selectedCourse.asStateFlow()
 
-    private val _notifications = MutableStateFlow<List<NotificationDto>>(repository.demoNotifications)
+    private val _notifications = MutableStateFlow<List<NotificationDto>>(emptyList())
     val notifications: StateFlow<List<NotificationDto>> = _notifications.asStateFlow()
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
-    init {
-        loadData()
-    }
+
 
     fun loadData() {
         viewModelScope.launch {
             _isLoading.value = true
+            _user.value = UserDto()
+            _courses.value = emptyList()
+            _notifications.value = emptyList()
+            _selectedCourse.value = null
             try {
                 repository.getProfile().onSuccess { _user.value = it }
                 repository.getCourses().onSuccess { _courses.value = it }
-                repository.getNotifications().onSuccess { _notifications.value = it }
+                _notifications.value = emptyList()
             } catch (_: Exception) {
                 // Ensure demo data remains intact on any unexpected error
             } finally {
@@ -50,21 +52,18 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun switchRole(newRole: String) {
-        val current = _user.value
-        val updated = current.copy(role = newRole)
-        _user.value = updated
-        repository.getTokenManager().saveUserRole(newRole)
-        repository.getTokenManager().saveUser(updated)
+        // Simulacion de roles deshabilitada.
     }
 
     fun selectCourse(courseId: String) {
+        _selectedCourse.value = null
         viewModelScope.launch {
             try {
                 repository.getCourseDetail(courseId).onSuccess {
                     _selectedCourse.value = it
                 }
             } catch (_: Exception) {
-                _selectedCourse.value = repository.demoCourses.find { it.id == courseId }
+                _selectedCourse.value = null
             }
         }
     }

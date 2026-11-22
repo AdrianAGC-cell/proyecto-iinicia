@@ -21,17 +21,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = IiniciaRepository(application)
 
     private val _authState = MutableStateFlow<AuthState>(
-        try {
-            val token = repository.getTokenManager().getToken()
-            val savedUser = repository.getTokenManager().getUser()
-            if (!token.isNullOrEmpty() && savedUser != null) {
-                AuthState.Success(savedUser)
-            } else {
-                AuthState.Idle
-            }
-        } catch (_: Exception) {
-            AuthState.Idle
-        }
+        AuthState.Idle
     )
     val authState: StateFlow<AuthState> = _authState.asStateFlow()
 
@@ -42,15 +32,21 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             result.onSuccess { response ->
                 _authState.value = AuthState.Success(response.user)
             }.onFailure { err ->
-                _authState.value = AuthState.Error(err.localizedMessage ?: "Error al iniciar sesión con Supabase.")
+                _authState.value = AuthState.Error(err.localizedMessage ?: "Error al iniciar sesión con Moodle.")
             }
         }
     }
 
     fun logout() {
-        try {
-            repository.logout()
-        } catch (_: Exception) {}
-        _authState.value = AuthState.Idle
+        viewModelScope.launch {
+            try {
+                repository.cerrarSesionMoodle()
+                _authState.value = AuthState.Idle
+            } catch (_: Exception) {
+                _authState.value = AuthState.Error(
+                    "Sesion local cerrada. No se pudo confirmar el cierre en el servidor."
+                )
+            }
+        }
     }
 }

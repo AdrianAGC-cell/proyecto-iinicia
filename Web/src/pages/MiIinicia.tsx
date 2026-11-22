@@ -15,41 +15,60 @@ import {
   Download
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { MOCK_STUDENT_COURSES } from '../data/mockData';
+
 import { SafeImage } from '../components/common/SafeImage';
-import { supabase } from '../lib/supabase';
+
 import { Course } from '../types';
 
 export const MiIinicia: React.FC = () => {
   const { user, triggerMoodleSSO } = useAuth();
   const [activeTab, setActiveTab] = useState<'cursos' | 'entregas' | 'calificaciones' | 'tramites'>('cursos');
   const [idCardOpen, setIdCardOpen] = useState(false);
-  const [courses, setCourses] = useState<Course[]>(MOCK_STUDENT_COURSES);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [courseError, setCourseError] = useState('');
 
   useEffect(() => {
-    const loadSupabaseCourses = async () => {
+    const loadMoodleCourses = async () => {
       try {
-        const { data, error } = await supabase.from('courses').select('*');
-        if (data && data.length > 0 && !error) {
-          const mapped: Course[] = data.map((c: any) => ({
-            id: c.id,
-            code: c.code || 'IA-401',
-            name: c.name,
-            professor: c.professor_name || 'Dr. Alejandro Méndez',
-            progress: 75,
-            pendingTasks: 1,
-            nextDeadline: '28 Octubre, 23:59',
-            grade: 9.4,
-            moodleCourseId: c.moodle_course_id || 204,
-            color: c.color_gradient || 'from-blue-600 to-indigo-700'
-          }));
-          setCourses(mapped);
+        setLoading(true);
+
+        const response = await fetch('/api/moodle/courses');
+
+        if (!response.ok) {
+          throw new Error('Error consultando Moodle');
         }
-      } catch (e) {
-        console.warn('Error loading courses from Supabase:', e);
+
+        const data = await response.json();
+
+        if (!data.conectado || !Array.isArray(data.cursos)) {
+          throw new Error('Respuesta incorrecta de Moodle');
+        }
+
+        const mapped: Course[] = data.cursos.map((c: any) => ({
+          id: String(c.id),
+          code: (c.nombreCorto || '').trim(),
+          name: c.nombre,
+          professor: 'Pendiente de consultar',
+          progress: 0,
+          pendingTasks: 0,
+          nextDeadline: '',
+          grade: 0,
+          moodleCourseId: c.id,
+          color: 'from-blue-600 to-indigo-700'
+        }));
+
+        setCourses(mapped);
+        setCourseError('');
+      } catch (error) {
+        setCourses([]);
+        setCourseError('No fue posible conectar con Moodle');
+      } finally {
+        setLoading(false);
       }
     };
-    loadSupabaseCourses();
+
+    loadMoodleCourses();
   }, []);
 
   const upcomingDeadlines = [
@@ -190,7 +209,7 @@ export const MiIinicia: React.FC = () => {
               : 'text-slate-600 hover:bg-slate-100'
           }`}
         >
-          Mis Cursos Autorizados ({courses.length})
+          Cursos de Moodle ({courses.length})
         </button>
         <button
           onClick={() => setActiveTab('entregas')}
@@ -232,11 +251,16 @@ export const MiIinicia: React.FC = () => {
               Periodo Académico Actual: Otoño 2026
             </h2>
             <span className="text-xs text-slate-500">
-              Sincronizado en tiempo real con Moodle Web Services
+              Consulta de Moodle Web Services - Modo prueba
             </span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {loading && <p>Consultando cursos de Moodle...</p>}
+            {courseError && <p className="text-red-600">{courseError}</p>}
+            {!loading && !courseError && courses.length === 0 && (
+              <p>No se encontraron cursos.</p>
+            )}
             {courses.map((course) => (
               <div
                 key={course.id}
@@ -264,12 +288,12 @@ export const MiIinicia: React.FC = () => {
                   <div className="mt-4 space-y-1.5">
                     <div className="flex justify-between text-xs">
                       <span className="text-slate-600 font-medium">Progreso del curso:</span>
-                      <span className="font-bold text-slate-900">{course.progress}%</span>
+                      <span className="font-bold text-slate-900">Pendiente</span>
                     </div>
                     <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
                       <div
                         className="h-full bg-[#22abe2] rounded-full"
-                        style={{ width: `${course.progress}%` }}
+                        style={{ width: `$Pendiente` }}
                       ></div>
                     </div>
                   </div>
@@ -278,11 +302,15 @@ export const MiIinicia: React.FC = () => {
                 <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
                   <div className="text-xs">
                     <span className="text-slate-500 block">Promedio parcial:</span>
-                    <span className="font-black text-[#22abe2] text-sm">{course.grade} / 10</span>
+                    <span className="font-black text-[#22abe2] text-sm">Pendiente</span>
                   </div>
 
                   <button
-                    onClick={() => triggerMoodleSSO(course.moodleCourseId)}
+                    onClick={() => window.open(
+                      'http://localhost:8080/course/view.php?id=' + course.moodleCourseId,
+                      '_blank',
+                      'noopener,noreferrer'
+                    )}
                     className="px-4 py-2 rounded-xl bg-[#22abe2] hover:bg-[#1b9ad0] text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
                   >
                     <span>Ir al aula virtual</span>
@@ -361,11 +389,11 @@ export const MiIinicia: React.FC = () => {
                     <td className="py-3 px-4 font-mono font-bold text-slate-700">{c.code}</td>
                     <td className="py-3 px-4 font-bold text-slate-900">{c.name}</td>
                     <td className="py-3 px-4 text-slate-600">{c.professor}</td>
-                    <td className="py-3 px-4 text-slate-600">8 Créditos</td>
-                    <td className="py-3 px-4 font-black text-[#22abe2]">{c.grade}</td>
+                    <td className="py-3 px-4 text-slate-600">Pendiente</td>
+                    <td className="py-3 px-4 font-black text-[#22abe2]">Pendiente</td>
                     <td className="py-3 px-4">
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#22abe2]/15 text-[#148ebf]">
-                        Acreditado
+                        Sin consultar
                       </span>
                     </td>
                   </tr>

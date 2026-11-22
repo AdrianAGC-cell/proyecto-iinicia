@@ -14,7 +14,7 @@ class IiniciaRepository(context: Context) {
     private val client = OkHttpClient.Builder()
         .addInterceptor(AuthInterceptor(tokenManager))
         .addInterceptor(HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BODY
+            level = HttpLoggingInterceptor.Level.NONE
         })
         .connectTimeout(8, TimeUnit.SECONDS)
         .readTimeout(8, TimeUnit.SECONDS)
@@ -27,6 +27,22 @@ class IiniciaRepository(context: Context) {
         .build()
 
     private val api = retrofit.create(IiniciaApi::class.java)
+
+    // En el emulador Android, 10.0.2.2 apunta a la computadora anfitriona.
+    private val moodleClient = OkHttpClient.Builder()
+        .cookieJar(MoodleSessionCookies)
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .build()
+
+    private val moodleRetrofit = Retrofit.Builder()
+        .baseUrl("http://127.0.0.1:5000/")
+        .client(moodleClient)
+        .addConverterFactory(GsonConverterFactory.create())
+        .build()
+
+    private val moodleApi = moodleRetrofit.create(IiniciaApi::class.java)
+
 
     private val supabaseRetrofit = Retrofit.Builder()
         .baseUrl(SupabaseClient.SUPABASE_URL + "/")
@@ -112,153 +128,238 @@ class IiniciaRepository(context: Context) {
     )
 
     suspend fun login(email: String, pass: String): Result<LoginResponse> {
-        val cleanEmail = email.trim().lowercase()
-        // Validate email format
-        if (cleanEmail.isBlank() || !Patterns.EMAIL_ADDRESS.matcher(cleanEmail).matches()) {
-            return Result.failure(Exception("Por favor ingrese un correo válido (ej. valeria.morales@iinicia.edu.mx o su Gmail)."))
+
+        val identificador = email.trim()
+
+        if (identificador.isBlank() || pass.isBlank()) {
+            return Result.failure(
+                Exception("Ingresa tu usuario y contraseña")
+            )
         }
-        if (pass.isBlank() || pass.length < 4) {
-            return Result.failure(Exception("La contraseña debe tener al menos 4 caracteres."))
+
+        val tipo = when {
+            identificador.contains("@") -> "correo"
+            identificador.startsWith("IIN-", ignoreCase = true) -> "matricula"
+            else -> "usuario"
         }
+
+        MoodleSessionCookies.clear()
+        tokenManager.clear()
 
         return try {
-            val token = "sb_jwt_${System.currentTimeMillis()}"
-
-            // 1. Query Supabase 'users' table
-            val userResponse = supabaseApi.getUsersSupabase(
-                apiKey = SupabaseClient.SUPABASE_KEY,
-                auth = "Bearer ${SupabaseClient.SUPABASE_KEY}",
-                emailQuery = "eq.$cleanEmail"
-            )
-
-            if (userResponse.isSuccessful && !userResponse.body().isNullOrEmpty()) {
-                val dbUser = userResponse.body()!!.first()
-                val mappedRole = when (dbUser.role.lowercase()) {
-                    "superadmin", "admin", "admin_academico" -> "Admin TI"
-                    "coordinador" -> "Coordinador"
-                    "profesor" -> "Profesor"
-                    "aspirante" -> "Aspirante"
-                    else -> "Estudiante"
-                }
-                val resolvedUser = dbUser.copy(role = mappedRole)
-                tokenManager.saveToken(token)
-                tokenManager.saveUser(resolvedUser)
-                return Result.success(LoginResponse(token = token, user = resolvedUser))
-            }
-
-            // 2. Query Supabase 'admission_applications' table (Permite iniciar sesión a aspirantes y admitidos)
-            val appResponse = supabaseApi.getApplicationsSupabase(
-                apiKey = SupabaseClient.SUPABASE_KEY,
-                auth = "Bearer ${SupabaseClient.SUPABASE_KEY}",
-                emailQuery = "eq.$cleanEmail"
-            )
-
-            if (appResponse.isSuccessful && !appResponse.body().isNullOrEmpty()) {
-                val appItem = appResponse.body()!!.first()
-                val isAdmitido = appItem.status.equals("ADMITIDO", ignoreCase = true)
-                val role = if (isAdmitido) "Estudiante" else "Aspirante"
-                val moodleId = if (isAdmitido) {
-                    "IIN-2026-${appItem.moodleUserId ?: appItem.id.replace("SOL-2026-", "")}"
-                } else {
-                    "EXP-${appItem.id}"
-                }
-
-                val applicantUser = UserDto(
-                    id = appItem.id,
-                    name = appItem.fullName,
-                    email = appItem.email,
-                    role = role,
-                    moodleId = moodleId,
-                    programName = appItem.programName
+            val response = moodleApi.moodleLogin(
+                MoodleLoginRequest(
+                    identificador = identificador,
+                    password = pass,
+                    tipo = tipo
                 )
-                tokenManager.saveToken(token)
-                tokenManager.saveUser(applicantUser)
-                return Result.success(LoginResponse(token = token, user = applicantUser))
-            }
-
-            // 3. Fallback para cuentas de prueba recién tecleadas
-            val fallbackRole = when {
-                cleanEmail.contains("admin") -> "Admin TI"
-                cleanEmail.contains("coord") || cleanEmail.contains("alarcon") -> "Coordinador"
-                cleanEmail.contains("prof") || cleanEmail.contains("mendez") -> "Profesor"
-                cleanEmail.contains("asp") || cleanEmail.contains("solis") -> "Aspirante"
-                else -> "Estudiante"
-            }
-            val fallbackName = cleanEmail.substringBefore("@")
-                .split(".", "_", "-")
-                .joinToString(" ") { part -> part.replaceFirstChar { it.uppercase() } }
-
-            val fallbackUser = UserDto(
-                id = cleanEmail,
-                name = fallbackName,
-                email = cleanEmail,
-                role = fallbackRole,
-                moodleId = "MOODLE-${cleanEmail.substringBefore("@").uppercase()}"
             )
-            tokenManager.saveToken(token)
-            tokenManager.saveUser(fallbackUser)
-            Result.success(LoginResponse(token = token, user = fallbackUser))
+
+            val datos = response.body()
+
+            if (!response.isSuccessful ||
+                datos?.success != true ||
+                datos.usuario == null
+            ) {
+                MoodleSessionCookies.clear()
+                return Result.failure(
+                    Exception("No se pudo iniciar sesión en Moodle")
+                )
+            }
+
+            val usuario = datos.usuario
+
+            val perfil = moodleApi.moodleProfile()
+
+            if (!perfil.isSuccessful ||
+                perfil.body()?.success != true ||
+                perfil.body()?.usuario?.id != usuario.id
+            ) {
+                MoodleSessionCookies.clear()
+                return Result.failure(
+                    Exception("No se pudo verificar la sesión")
+                )
+            }
+
+            val user = UserDto(
+                id = usuario.id.toString(),
+                name = usuario.nombre,
+                email = if (tipo == "correo") identificador else "",
+                role = "Estudiante",
+                moodleId = usuario.id.toString()
+            )
+
+            Result.success(
+                LoginResponse(
+                    token = "",
+                    user = user
+                )
+            )
+
         } catch (e: Exception) {
-            Result.failure(Exception("Error de conexión con Supabase: ${e.localizedMessage ?: "Verifique su acceso a internet."}"))
+            MoodleSessionCookies.clear()
+            Result.failure(
+                Exception("No se pudo conectar con el servidor Iinicia")
+            )
         }
     }
 
     suspend fun getProfile(): Result<UserDto> {
         return try {
-            val savedUser = tokenManager.getUser()
-            if (savedUser != null) {
-                Result.success(savedUser.copy(role = tokenManager.getUserRole()))
+            val response = moodleApi.moodleProfile()
+            val datos = response.body()
+            val usuario = datos?.usuario
+
+            if (response.isSuccessful &&
+                datos?.success == true &&
+                usuario != null
+            ) {
+                Result.success(
+                    UserDto(
+                        id = usuario.id.toString(),
+                        name = usuario.nombre,
+                        role = "Estudiante",
+                        moodleId = usuario.id.toString()
+                    )
+                )
             } else {
-                val token = tokenManager.getToken()
-                if (!token.isNullOrEmpty()) {
-                    Result.success(demoUser.copy(role = tokenManager.getUserRole()))
-                } else {
-                    Result.failure(Exception("No hay sesión activa"))
-                }
+                Result.failure(Exception("No hay sesión activa"))
             }
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
 
+    suspend fun cerrarSesionMoodle() {
+        try {
+            val response = moodleApi.moodleLogout()
+            if (!response.isSuccessful) {
+                throw Exception("No se pudo cerrar la sesión en el servidor")
+            }
+        } finally {
+            MoodleSessionCookies.clear()
+            tokenManager.clear()
+        }
+    }
+
+    suspend fun descargarPdf(
+        courseId: Long,
+        moduleId: Long,
+        destino: java.io.File
+    ): Result<java.io.File> =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val response = moodleApi.descargarPdf(
+                    courseId,
+                    moduleId
+                )
+
+                val body = response.body()
+
+                if (!response.isSuccessful || body == null) {
+                    response.errorBody()?.close()
+                    body?.close()
+                    throw Exception("No se pudo descargar el PDF")
+                }
+
+                body.use { pdf ->
+                    if (pdf.contentType()?.subtype != "pdf") {
+                        throw Exception("El archivo no es un PDF")
+                    }
+
+                    pdf.byteStream().use { input ->
+                        destino.outputStream().use { output ->
+                            input.copyTo(output)
+                        }
+                    }
+                }
+
+                Result.success(destino)
+
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                destino.delete()
+                throw e
+            } catch (e: Exception) {
+                destino.delete()
+                Result.failure(e)
+            }
+        }
+
     suspend fun getCourses(): Result<List<CourseDto>> {
         return try {
-            val response = supabaseApi.getCoursesSupabase(
-                apiKey = SupabaseClient.SUPABASE_KEY,
-                auth = "Bearer ${tokenManager.getToken() ?: SupabaseClient.SUPABASE_KEY}"
-            )
-            if (response.isSuccessful && !response.body().isNullOrEmpty()) {
-                val dbCourses = response.body()!!.map { c ->
-                    val demoMatching = demoCourses.find { it.id == c.id }
-                    c.copy(
-                        progress = if (c.progress > 0) c.progress else (demoMatching?.progress ?: 0.75f),
-                        tasks = demoMatching?.tasks ?: listOf(
-                            MoodleTaskDto("T-1", c.id, "Actividad Práctica en Aula Virtual", "30 Oct 2026", "Pendiente"),
-                            MoodleTaskDto("T-2", c.id, "Evaluación Continua Moodle", "02 Nov 2026", "En curso")
-                        )
-                    )
-                }
-                return Result.success(dbCourses)
+            val perfil = moodleApi.moodleProfile()
+
+            if (!perfil.isSuccessful ||
+                perfil.body()?.success != true
+            ) {
+                return Result.failure(
+                    Exception("No hay una sesión activa")
+                )
             }
-            Result.success(demoCourses)
+
+            val response = moodleApi.getMoodleCourses()
+            val payload = response.body()
+
+            if (response.isSuccessful &&
+                payload?.conectado == true
+            ) {
+                val cursos = payload.cursos
+                    .filter { it.visible == 1 }
+                    .map { curso ->
+                        CourseDto(
+                            id = curso.id.toString(),
+                            title = curso.nombre,
+                            description = curso.resumen
+                                .replace(Regex("<[^>]*>"), " ")
+                                .trim(),
+                            progress = 0f,
+                            instructor = "Curso de Moodle",
+                            semester = curso.nombreCorto.trim(),
+                            tasks = emptyList()
+                        )
+                    }
+
+                Result.success(cursos)
+            } else {
+                Result.failure(
+                    Exception("No se pudieron obtener los cursos de Moodle")
+                )
+            }
         } catch (e: Exception) {
-            Result.success(demoCourses)
+            Result.failure(e)
         }
     }
 
     suspend fun getCourseDetail(courseId: String): Result<CourseDto> {
-        return try {
-            val listResult = getCourses()
-            if (listResult.isSuccess) {
-                val found = listResult.getOrNull()?.find { it.id == courseId }
-                if (found != null) return Result.success(found)
+        val baseCourse = getCourses().getOrNull()?.find { it.id == courseId }
+        if (baseCourse != null && courseId.toLongOrNull() != null) {
+            return try {
+                val response = moodleApi.getMoodleCourseContents(courseId.toLong())
+                val payload = response.body()
+                if (response.isSuccessful && payload?.conectado == true) {
+                    val tasks = payload.secciones.flatMap { seccion ->
+                        seccion.actividades.map { actividad ->
+                            MoodleTaskDto(
+                                id = actividad.id.toString(),
+                                courseId = courseId,
+                                title = "${seccion.nombre}: ${actividad.nombre}",
+                                dueDate = actividad.tipo,
+                                status = if (actividad.visible == 1) "Disponible" else "Oculta"
+                            )
+                        }
+                    }
+                    Result.success(baseCourse.copy(tasks = tasks))
+                } else {
+                    Result.success(baseCourse)
+                }
+            } catch (_: Exception) {
+                Result.success(baseCourse)
             }
-            val course = demoCourses.find { it.id == courseId } ?: demoCourses.first()
-            Result.success(course)
-        } catch (e: Exception) {
-            val course = demoCourses.find { it.id == courseId } ?: demoCourses.first()
-            Result.success(course)
         }
+
+        return Result.failure(
+            Exception("No se encontro el curso solicitado")
+        )
     }
 
     suspend fun getNotifications(): Result<List<NotificationDto>> {

@@ -9,6 +9,26 @@ import retrofit2.http.Path
 import retrofit2.http.Query
 
 interface IiniciaApi {
+
+    @retrofit2.http.Streaming
+    @GET("api/auth/courses/{courseId}/resources/{moduleId}")
+    suspend fun descargarPdf(
+        @Path("courseId") courseId: Long,
+        @Path("moduleId") moduleId: Long
+    ): Response<okhttp3.ResponseBody>
+
+
+    @POST("api/auth/login")
+    suspend fun moodleLogin(
+        @Body request: MoodleLoginRequest
+    ): Response<MoodleAuthResponse>
+
+    @GET("api/auth/me")
+    suspend fun moodleProfile(): Response<MoodleAuthResponse>
+
+    @POST("api/auth/logout")
+    suspend fun moodleLogout(): Response<MoodleAuthResponse>
+
     @POST("api/auth/login")
     suspend fun login(@Body request: LoginRequest): Response<LoginResponse>
 
@@ -23,6 +43,15 @@ interface IiniciaApi {
 
     @GET("api/notifications")
     suspend fun getNotifications(): Response<List<NotificationDto>>
+
+    // Backend propio: cursos y contenidos reales de Moodle
+    @GET("api/moodle/courses")
+    suspend fun getMoodleCourses(): Response<MoodleCoursesResponse>
+
+    @GET("api/moodle/courses/{id}/contents")
+    suspend fun getMoodleCourseContents(
+        @Path("id") courseId: Long
+    ): Response<MoodleContentsResponse>
 
     // Supabase Auth endpoint
     @POST("auth/v1/token")

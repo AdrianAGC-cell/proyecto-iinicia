@@ -23,6 +23,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -57,8 +58,11 @@ fun LoginScreen(
 
     val authState by authViewModel.authState.collectAsState()
 
-    if (authState is AuthState.Success) {
-        onLoginSuccess()
+    LaunchedEffect(authState) {
+        if (authState is AuthState.Success) {
+            password = ""
+            onLoginSuccess()
+        }
     }
 
     Box(
@@ -111,7 +115,7 @@ fun LoginScreen(
                         email = it
                         errorMessage = null
                     },
-                    label = { Text("Correo (ej. valeria.morales@iinicia.edu.mx)", color = TextMuted) },
+                    label = { Text("Usuario, correo o matrícula", color = TextMuted) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
@@ -144,13 +148,14 @@ fun LoginScreen(
 
                 // Login Button
                 Button(
+                    enabled = authState !is AuthState.Loading,
                     onClick = {
-                        if (email.isBlank() || !Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches()) {
-                            errorMessage = "Ingrese un correo válido (ej. valeria.morales@iinicia.edu.mx o su Gmail)."
+                        if (email.isBlank()) {
+                            errorMessage = "Ingresa tu usuario, correo o matrícula."
                             return@Button
                         }
-                        if (password.length < 4) {
-                            errorMessage = "La contraseña debe tener al menos 4 caracteres."
+                        if (password.isBlank()) {
+                            errorMessage = "Ingresa tu contraseña."
                             return@Button
                         }
                         authViewModel.login(email.trim(), password)
@@ -162,7 +167,7 @@ fun LoginScreen(
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Text(
-                        text = if (authState is AuthState.Loading) "Autenticando..." else "Iniciar Sesión en Supabase",
+                        text = if (authState is AuthState.Loading) "Autenticando..." else "Iniciar Sesión",
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
@@ -171,66 +176,7 @@ fun LoginScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Quick Demo Logins for Evaluator (Matches Web)
-                Text(
-                    text = "ACCESO RÁPIDO DE EVALUACIÓN",
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF6B7280),
-                    letterSpacing = 1.sp
-                )
 
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    QuickLoginChip(
-                        role = "Estudiante",
-                        name = "Valeria Morales",
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        email = "valeria.morales@iinicia.edu.mx"
-                        password = "password123"
-                        authViewModel.login(email, password)
-                    }
-                    QuickLoginChip(
-                        role = "Coordinador",
-                        name = "Dra. Alarcón",
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        email = "sofia.alarcon@iinicia.edu.mx"
-                        password = "password123"
-                        authViewModel.login(email, password)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    QuickLoginChip(
-                        role = "Aspirante",
-                        name = "Diego Solís",
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        email = "diego.solis@gmail.com"
-                        password = "password123"
-                        authViewModel.login(email, password)
-                    }
-                    QuickLoginChip(
-                        role = "Admin TI",
-                        name = "Ing. Roberto Peña",
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        email = "admin.sistemas@iinicia.edu.mx"
-                        password = "password123"
-                        authViewModel.login(email, password)
-                    }
-                }
             }
         }
     }

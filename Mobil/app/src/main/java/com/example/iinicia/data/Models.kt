@@ -72,3 +72,65 @@ data class SupabaseAuthResponse(
     val error: String? = null,
     val error_description: String? = null
 )
+
+
+data class MoodleCoursesResponse(
+    val conectado: Boolean = false,
+    val total: Int = 0,
+    val cursos: List<MoodleCourseItem> = emptyList(),
+    val error: String? = null
+)
+
+data class MoodleCourseItem(
+    val id: Long = 0,
+    val nombre: String = "",
+    val nombreCorto: String = "",
+    val idCategoria: Int = 0,
+    val visible: Int = 1,
+    val resumen: String = ""
+)
+
+data class MoodleContentsResponse(
+    val conectado: Boolean = false,
+    val cursoId: Long = 0,
+    val totalSecciones: Int = 0,
+    val secciones: List<MoodleSectionItem> = emptyList(),
+    val error: String? = null
+)
+
+data class MoodleSectionItem(
+    val id: Long = 0,
+    val nombre: String = "",
+    val resumen: String = "",
+    val visible: Int = 1,
+    val actividades: List<MoodleActivityItem> = emptyList()
+)
+
+data class MoodleActivityItem(
+    val id: Long = 0,
+    val nombre: String = "",
+    val tipo: String = "",
+    val url: String? = null,
+    val visible: Int = 1,
+    val descripcion: String = ""
+)
+
+data class MoodleLoginRequest(
+    val identificador: String,
+    val password: String,
+    val tipo: String
+)
+
+data class MoodleAuthResponse(
+    val success: Boolean = false,
+    val mensaje: String? = null,
+    val error: String? = null,
+    val usuario: MoodleUserProfile? = null
+)
+
+data class MoodleUserProfile(
+    val id: Long = 0,
+    val username: String = "",
+    val nombre: String = "",
+    val imagen: String? = null
+)

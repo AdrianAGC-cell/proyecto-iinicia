@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+
+import React, { useEffect, useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
-import { 
-  ArrowLeft, 
-  CheckCircle2, 
-  FileText, 
-  MessageSquare, 
-  Video, 
-  Award, 
+import {
+  ArrowLeft,
+  CheckCircle2,
+  FileText,
+  MessageSquare,
+  Video,
+  Award,
   ExternalLink,
   ChevronRight,
   ShieldCheck
@@ -15,231 +16,414 @@ import { useAuth } from '../context/AuthContext';
 import { MOCK_STUDENT_COURSES } from '../data/mockData';
 import { SafeImage } from '../components/common/SafeImage';
 
+type MoodleCourse = {
+  id: number;
+  nombre: string;
+  nombreCorto: string;
+  idCategoria: number;
+  visible: number;
+  resumen: string;
+};
+
+type MoodleSection = {
+  id: number;
+  nombre: string;
+  resumen: string;
+  visible: number;
+  actividades: {
+    id: number;
+    nombre: string;
+    tipo: string;
+    url?: string;
+    visible: number;
+    descripcion?: string;
+  }[];
+};
+
+type MoodleModule = {
+  title: string;
+  description: string;
+  type: string;
+  icon: React.ReactNode;
+  completed: boolean;
+};
+
 export const MoodlePreview: React.FC = () => {
   const { user } = useAuth();
   const location = useLocation();
   const targetCourseId = (location.state as any)?.courseId;
 
-  const currentCourse = MOCK_STUDENT_COURSES.find(c => c.moodleCourseId === targetCourseId) || MOCK_STUDENT_COURSES[0];
+  const [moodleCourses, setMoodleCourses] = useState<MoodleCourse[]>([]);
+  const [moodleLoading, setMoodleLoading] = useState(true);
+  const [moodleError, setMoodleError] = useState('');
+  const [moodleSections, setMoodleSections] = useState<MoodleSection[]>([]);
+  const [contentsLoading, setContentsLoading] = useState(true);
+  const [contentsError, setContentsError] = useState('');
 
-  const modules = [
-    {
-      week: 'Bloque General',
-      title: 'Presentación, Normas y Recursos del Curso',
-      items: [
-        { type: 'pdf', title: 'Syllabus Oficial y Rúbricas de Evaluación (RVOE SEP)', icon: FileText, date: '15 Oct' },
-        { type: 'forum', title: 'Foro de Presentación y Dudas con el Claustro', icon: MessageSquare, replies: 28 },
-        { type: 'link', title: 'Acceso a Laboratorio Virtual GPU (Google Cloud / Colab Pro)', icon: ExternalLink, date: 'Permanente' }
-      ]
-    },
-    {
-      week: 'Unidad 1',
-      title: 'Fundamentos de Aprendizaje Profundo y Tensores en PyTorch',
-      items: [
-        { type: 'video', title: 'Clase Magistral: De la Neurona Biológica al Perceptrón Multicapa', icon: Video, duration: '45 min' },
-        { type: 'pdf', title: 'Lectura Obligatoria: Arquitectura de Redes Feed-Forward', icon: FileText, date: '18 Oct' },
-        { type: 'assignment', title: 'Tarea Práctica 1: Implementación de Descenso de Gradiente desde cero', icon: Award, deadline: '24 Oct 2026, 23:59', status: 'Pendiente de Calificación' }
-      ]
-    },
-    {
-      week: 'Unidad 2',
-      title: 'Redes Convolucionales (CNN) y Visión Computacional',
-      items: [
-        { type: 'video', title: 'Clase Magistral: Filtros, Pooling y Transfer Learning', icon: Video, duration: '52 min' },
-        { type: 'assignment', title: 'Laboratorio Evaluatorio 2: Clasificación de Imágenes con ResNet-50', icon: Award, deadline: '05 Nov 2026', status: 'Abierto' }
-      ]
-    }
-  ];
+  useEffect(() => {
+    let activo = true;
+
+    const cargarCursos = async () => {
+      try {
+        const response = await fetch('/api/moodle/courses');
+        const data = await response.json();
+
+        if (!response.ok || !data.conectado) {
+          throw new Error(
+            data.error || 'No se pudieron cargar los cursos de Moodle.'
+          );
+        }
+
+        if (activo) {
+          setMoodleCourses(data.cursos || []);
+          setMoodleError('');
+        }
+      } catch (error) {
+        if (activo) {
+          setMoodleError(
+            error instanceof Error
+              ? error.message
+              : 'Error de conexión con Moodle.'
+          );
+        }
+      } finally {
+        if (activo) {
+          setMoodleLoading(false);
+        }
+      }
+    };
+
+    cargarCursos();
+
+    return () => {
+      activo = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let activo = true;
+
+    const cargarContenidos = async () => {
+      try {
+        const courseId = Number(targetCourseId) || 2;
+        const response = await fetch(
+          `/api/moodle/courses/${courseId}/contents`
+        );
+        const data = await response.json();
+
+        if (!response.ok || !data.conectado) {
+          throw new Error(data.error || 'No se pudo cargar el contenido.');
+        }
+
+        if (activo) {
+          setMoodleSections(data.secciones || []);
+          setContentsError('');
+        }
+      } catch (error) {
+        if (activo) {
+          setContentsError(
+            error instanceof Error
+              ? error.message
+              : 'Error al consultar el contenido de Moodle.'
+          );
+        }
+      } finally {
+        if (activo) setContentsLoading(false);
+      }
+    };
+
+    cargarContenidos();
+
+    return () => {
+      activo = false;
+    };
+  }, [targetCourseId]);
+
+  const currentCourse =
+    MOCK_STUDENT_COURSES.find(
+      c => String(c.moodleCourseId) === String(targetCourseId)
+    ) || MOCK_STUDENT_COURSES[0];
+
+  const cursoMoodle =
+    moodleCourses.find(c => c.id === Number(targetCourseId)) ||
+    moodleCourses[0];
+
+  const nombreCurso =
+    cursoMoodle?.nombre || currentCourse?.name || 'Curso de Moodle';
+
+  const codigoCurso =
+    cursoMoodle?.nombreCorto || currentCourse?.code || 'MOODLE';
+
+  const resumenCurso = cursoMoodle?.resumen
+    ? cursoMoodle.resumen.replace(/<[^>]*>/g, '').trim()
+    : 'Consulta aquí la información de tu curso.';
 
   return (
-    <div className="min-h-screen bg-slate-100 font-sans pb-20">
-      {/* Simulation Banner */}
-      <div className="bg-[#05080f] text-slate-300 text-xs py-2 px-4 border-b border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-[#22abe2] animate-pulse"></span>
-          <span className="font-mono text-[#22abe2] font-bold">aula.iinicia.org</span>
-          <span className="hidden sm:inline text-slate-400">• Entorno Moodle 4.x con tema universitario oficial</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="text-slate-400 hidden sm:inline">SSO activo: {user?.email}</span>
+    <div className="min-h-screen bg-slate-50">
+      <header className="border-b border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
           <Link
-            to="/mi-iinicia"
-            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#22abe2] hover:bg-[#1b9ad0] text-white font-bold text-xs transition"
+            to="/"
+            className="flex items-center gap-2 text-sm font-medium text-slate-600 transition hover:text-blue-600"
           >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Volver a Mi IINICIA</span>
+            <ArrowLeft size={18} />
+            Volver al inicio
           </Link>
-        </div>
-      </div>
 
-      {/* Moodle Header with Official Logo */}
-      <header className="bg-white border-b border-slate-200 shadow-xs px-4 sm:px-8 py-3 sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img
-              src="/logo-iinicia.png"
-              alt="I²NICIA"
-              className="h-10 w-auto object-contain"
-            />
-            <span className="text-xs font-bold text-[#148ebf] bg-[#22abe2]/10 px-2.5 py-1 rounded-md border border-[#22abe2]/20">
-              Campus Virtual
-            </span>
-          </div>
-
-          <div className="flex items-center gap-4 text-xs font-semibold text-slate-600">
-            <span className="hidden md:inline text-slate-500">
-              Bienvenida(o), <strong className="text-slate-800">{user?.name}</strong>
-            </span>
-            <SafeImage
-              src={user?.avatar}
-              alt={user?.name || 'Estudiante'}
-              isAvatar={true}
-              className="w-8 h-8 rounded-full object-cover ring-2 ring-[#22abe2]"
-            />
+          <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+            <ShieldCheck size={18} className="text-green-600" />
+            Iinicia Prueba
           </div>
         </div>
       </header>
 
-      {/* Course Banner */}
-      <div className="bg-gradient-to-r from-[#05080f] via-[#09101d] to-[#05080f] text-white py-8 px-4 sm:px-8 border-b border-slate-800">
-        <div className="max-w-7xl mx-auto space-y-3">
-          <div className="flex items-center gap-2 text-xs text-slate-300 font-semibold">
-            <span>Mis Cursos</span>
-            <ChevronRight className="w-3.5 h-3.5 text-[#22abe2]" />
-            <span>Otoño 2026</span>
-            <ChevronRight className="w-3.5 h-3.5 text-[#22abe2]" />
-            <span className="text-[#22abe2] font-mono">{currentCourse.code}</span>
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
-            {currentCourse.name}
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mb-6">
+          <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-blue-600">
+            Plataforma de aprendizaje
+          </p>
+
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+            Mis cursos
           </h1>
-          <p className="text-xs text-slate-300">
-            Docente Titular: <strong className="text-white">{currentCourse.professor}</strong> • Cohorte 2026-A • {currentCourse.progress}% completado
+
+          <p className="mt-2 text-slate-600">
+            Consulta la información de tus cursos y accede a tus recursos de
+            aprendizaje.
           </p>
         </div>
-      </div>
 
-      {/* Main LMS Layout */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-8 pt-8 grid grid-cols-1 lg:grid-cols-4 gap-8">
-        {/* Left / Main Modules Column */}
-        <div className="lg:col-span-3 space-y-6">
-          {modules.map((mod, modIdx) => (
-            <div key={modIdx} className="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden">
-              <div className="bg-slate-50/80 px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+        {moodleLoading && (
+          <div className="mb-6 rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-800">
+            Cargando cursos desde Moodle...
+          </div>
+        )}
+
+        {moodleError && (
+          <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            <p className="font-semibold">
+              No fue posible cargar los cursos de Moodle.
+            </p>
+            <p className="mt-1">{moodleError}</p>
+            <p className="mt-2">
+              Verifica que el backend esté ejecutándose en el puerto 3001 y que
+              el proxy de Vite esté configurado.
+            </p>
+          </div>
+        )}
+
+        {!moodleLoading && !moodleError && moodleCourses.length === 0 && (
+          <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+            La conexión se realizó, pero Moodle no devolvió cursos disponibles.
+          </div>
+        )}
+
+        {cursoMoodle && (
+          <section className="mb-8 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="bg-gradient-to-r from-blue-700 to-indigo-700 p-6 text-white sm:p-8">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#148ebf] bg-[#22abe2]/15 px-2 py-0.5 rounded">
-                    {mod.week}
+                  <span className="inline-flex items-center rounded-full bg-white/15 px-3 py-1 text-xs font-semibold">
+                    {codigoCurso}
                   </span>
-                  <h3 className="text-sm sm:text-base font-black text-slate-900 mt-1">
-                    {mod.title}
-                  </h3>
+
+                  <h2 className="mt-4 text-2xl font-bold sm:text-3xl">
+                    {nombreCurso}
+                  </h2>
+
+                  <p className="mt-3 max-w-2xl text-sm leading-6 text-blue-100">
+                    {resumenCurso}
+                  </p>
+                </div>
+
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-white/15">
+                  <Award size={30} />
                 </div>
               </div>
+            </div>
 
-              <div className="divide-y divide-slate-100 p-2">
-                {mod.items.map((item, itemIdx) => {
-                  const Icon = item.icon;
-                  return (
-                    <div
-                      key={itemIdx}
-                      className="p-4 flex items-center justify-between hover:bg-slate-50/80 rounded-2xl transition cursor-pointer group"
-                    >
-                      <div className="flex items-center gap-3.5">
-                        <div className="w-9 h-9 rounded-xl bg-[#22abe2]/10 text-[#22abe2] flex items-center justify-center shrink-0 group-hover:bg-[#22abe2] group-hover:text-white transition">
-                          <Icon className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <h4 className="text-xs sm:text-sm font-bold text-slate-800 group-hover:text-[#22abe2] transition">
-                            {item.title}
-                          </h4>
-                          <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5">
-                            {item.date && <span>Publicado: {item.date}</span>}
-                            {item.duration && <span>Duración: {item.duration}</span>}
-                            {item.deadline && <span className="text-amber-600 font-semibold">Entrega: {item.deadline}</span>}
-                            {item.replies && <span>{item.replies} intervenciones</span>}
-                          </div>
-                        </div>
-                      </div>
+            <div className="grid gap-4 p-6 sm:grid-cols-3">
+              <div className="rounded-xl bg-slate-50 p-4">
+                <p className="text-sm text-slate-500">ID del curso Moodle</p>
+                <p className="mt-1 text-xl font-bold text-slate-900">
+                  {cursoMoodle.id}
+                </p>
+              </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
-                        {item.status ? (
-                          <span className="text-[10px] font-bold px-2 py-1 rounded bg-amber-50 text-amber-700 border border-amber-200">
-                            {item.status}
-                          </span>
-                        ) : (
-                          <CheckCircle2 className="w-5 h-5 text-[#22abe2]" />
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className="rounded-xl bg-slate-50 p-4">
+                <p className="text-sm text-slate-500">Categoría</p>
+                <p className="mt-1 text-xl font-bold text-slate-900">
+                  {cursoMoodle.idCategoria}
+                </p>
+              </div>
+
+              <div className="rounded-xl bg-slate-50 p-4">
+                <p className="text-sm text-slate-500">Estado</p>
+                <p className="mt-1 flex items-center gap-2 text-xl font-bold text-slate-900">
+                  <span
+                    className={`h-2.5 w-2.5 rounded-full ${
+                      cursoMoodle.visible ? 'bg-green-500' : 'bg-slate-400'
+                    }`}
+                  />
+                  {cursoMoodle.visible ? 'Visible' : 'Oculto'}
+                </p>
               </div>
             </div>
-          ))}
-        </div>
+          </section>
+        )}
 
-        {/* Right Sidebar: LMS Widgets */}
-        <div className="space-y-6">
-          {/* Progress Widget */}
-          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-              Finalización de Actividades
-            </h4>
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs font-bold text-slate-700">
-                <span>Progreso total:</span>
-                <span>{currentCourse.progress}%</span>
-              </div>
-              <div className="w-full h-2.5 rounded-full bg-slate-100 overflow-hidden">
-                <div
-                  className="h-full bg-[#22abe2] rounded-full"
-                  style={{ width: `${currentCourse.progress}%` }}
-                ></div>
-              </div>
-              <p className="text-[11px] text-slate-500">
-                Has completado 12 de 15 actividades obligatorias.
+        <section>
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">
+                Contenido del curso
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Secciones y actividades consultadas directamente desde Moodle.
               </p>
             </div>
           </div>
 
-          {/* Teacher Box */}
-          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-              Profesor Titular
-            </h4>
-            <div className="flex items-center gap-3">
-              <SafeImage
-                src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80"
-                alt={currentCourse.professor}
-                isAvatar={true}
-                className="w-12 h-12 rounded-xl object-cover ring-2 ring-[#22abe2]/30 shadow-xs"
-              />
-              <div>
-                <p className="text-xs font-bold text-slate-900">{currentCourse.professor}</p>
-                <p className="text-[10px] text-slate-500">Catedrático e Investigador</p>
-              </div>
+          {contentsLoading && (
+            <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-800">
+              Cargando secciones y actividades desde Moodle...
             </div>
-            <button
-              onClick={() => alert(`Abriendo mensajería instantánea con el profesor ${currentCourse.professor}`)}
-              className="w-full py-2 rounded-xl bg-[#22abe2]/10 text-[#22abe2] hover:bg-[#22abe2]/20 text-xs font-bold transition flex items-center justify-center gap-1.5"
-            >
-              <MessageSquare className="w-3.5 h-3.5" />
-              <span>Enviar Mensaje Privado</span>
-            </button>
+          )}
+
+          {contentsError && (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              No fue posible cargar el contenido: {contentsError}
+            </div>
+          )}
+
+          {!contentsLoading && !contentsError && moodleSections.length === 0 && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+              Moodle no devolvió secciones para este curso.
+            </div>
+          )}
+
+          <div className="space-y-4">
+            {moodleSections.map((seccion) => (
+              <div
+                key={seccion.id}
+                className="overflow-hidden rounded-xl border border-slate-200 bg-white"
+              >
+                <div className="flex items-center gap-3 border-b border-slate-100 bg-slate-50 p-4">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+                    <FileText size={20} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-semibold text-slate-900">
+                      {seccion.nombre || `Sección ${seccion.id}`}
+                    </h3>
+                    <p className="text-sm text-slate-500">
+                      {seccion.actividades.length} actividad(es)
+                    </p>
+                  </div>
+                  <span className={`rounded-full px-2 py-1 text-xs ${
+                    seccion.visible
+                      ? 'bg-green-100 text-green-700'
+                      : 'bg-slate-200 text-slate-600'
+                  }`}>
+                    {seccion.visible ? 'Visible' : 'Oculta'}
+                  </span>
+                </div>
+
+                {seccion.resumen && (
+                  <div
+                    className="border-b border-slate-100 p-4 text-sm text-slate-600"
+                    dangerouslySetInnerHTML={{ __html: seccion.resumen }}
+                  />
+                )}
+
+                {seccion.actividades.length > 0 ? (
+                  <div className="divide-y divide-slate-100">
+                    {seccion.actividades.map((actividad) => (
+                      <div
+                        key={actividad.id}
+                        className="flex items-center gap-3 p-4"
+                      >
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+                          {actividad.tipo === 'forum' ? (
+                            <MessageSquare size={20} />
+                          ) : actividad.tipo === 'url' || actividad.tipo === 'page' ? (
+                            <FileText size={20} />
+                          ) : (
+                            <CheckCircle2 size={20} />
+                          )}
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-slate-900">
+                            {actividad.nombre}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {actividad.tipo}
+                            {!actividad.visible ? ' · Oculta' : ''}
+                          </p>
+                        </div>
+
+                        {actividad.url && (
+                          <a
+                            href={actividad.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                          >
+                            Abrir
+                            <ExternalLink size={14} />
+                          </a>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="p-4 text-sm text-slate-500">
+                    Esta sección todavía no tiene actividades.
+                  </p>
+                )}
+              </div>
+            ))}
           </div>
 
-          {/* Quick SSO Security Indicator */}
-          <div className="bg-[#22abe2]/10 border border-[#22abe2]/30 rounded-3xl p-5 space-y-2 text-xs text-slate-800">
-            <div className="flex items-center gap-2 font-bold text-slate-900">
-              <ShieldCheck className="w-4 h-4 text-[#22abe2]" />
-              <span>Sesión Autenticada vía OIDC</span>
-            </div>
-            <p className="text-[11px] leading-relaxed text-slate-600">
-              Tu token fue verificado contra el proveedor de identidad de I²NICIA. No se requirió una contraseña local de Moodle.
+          <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <p className="text-sm font-semibold text-amber-900">
+              Aviso sobre el contenido
+            </p>
+            <p className="mt-1 text-sm leading-6 text-amber-800">
+              La información del curso se consulta desde Moodle. Los módulos
+              mostrados arriba son una vista de ejemplo y todavía no representan
+              las actividades reales de Moodle.
             </p>
           </div>
-        </div>
-      </div>
+        </section>
+
+        <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="font-bold text-slate-900">
+                ¿Necesitas acceder a Moodle?
+              </h2>
+              <p className="mt-1 text-sm text-slate-600">
+                Abre la plataforma para consultar el contenido completo del
+                curso.
+              </p>
+            </div>
+
+            <a
+              href="http://localhost:8000"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
+            >
+              Abrir Moodle
+              <ExternalLink size={16} />
+            </a>
+          </div>
+        </section>
+      </main>
     </div>
   );
 };
+
+export default MoodlePreview;

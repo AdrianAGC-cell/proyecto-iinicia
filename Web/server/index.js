@@ -1,9 +1,16 @@
+import { configurarArchivosMoodle } from './moodleFiles.js';
 import express from 'express';
 import cors from 'cors';
 import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
+import { configurarAutenticacion } from './authRoutes.js';
+
+dotenv.config({ path: './server/.env' });
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const MOODLE_URL = process.env.MOODLE_URL;
+const MOODLE_TOKEN = process.env.MOODLE_TOKEN;
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://hwzkpkmithroyobntypq.supabase.co';
 const SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh3emtwa21pdGhyb3lvYm50eXBxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI2MzU2NTYsImV4cCI6MjEwODIxMTY1Nn0.ncSUUAO-jojOdTu6NzuJxf7lxFCSyg3O_02yU9n1Jt0';
@@ -11,6 +18,143 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 app.use(cors());
 app.use(express.json());
+
+// Configurar autenticacion real con Moodle
+configurarAutenticacion(app);
+configurarArchivosMoodle(app);
+// Consultar secciones y actividades reales de Moodle
+app.get('/api/moodle/courses/:id/contents', async (req, res) => {
+  try {
+    const courseId = Number(req.params.id);
+
+    if (!Number.isSafeInteger(courseId) || courseId <= 0) {
+      return res.status(400).json({
+        conectado: false,
+        error: 'ID de curso inválido'
+      });
+    }
+
+    const url = new URL('/webservice/rest/server.php', MOODLE_URL);
+
+    const params = new URLSearchParams({
+      wstoken: MOODLE_TOKEN,
+      wsfunction: 'core_course_get_contents',
+      moodlewsrestformat: 'json',
+      courseid: String(courseId)
+    });
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: params,
+      signal: AbortSignal.timeout(10000)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Moodle respondió HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (data.exception) {
+      throw new Error(data.message || 'Error de Moodle');
+    }
+
+    if (!Array.isArray(data)) {
+      throw new Error('Respuesta inesperada de Moodle');
+    }
+
+    const secciones = data.map(seccion => ({
+      id: seccion.id,
+      nombre: seccion.name || 'General',
+      resumen: seccion.summary || '',
+      visible: seccion.visible,
+      actividades: (seccion.modules || []).map(actividad => ({
+        id: actividad.id,
+        nombre: actividad.name,
+        tipo: actividad.modname,
+        url: actividad.url || '',
+        visible: actividad.visible,
+        descripcion: actividad.description || ''
+      }))
+    }));
+
+    res.json({
+      conectado: true,
+      secciones
+    });
+
+  } catch (error) {
+    console.error('Error consultando contenidos de Moodle:', error.message);
+
+    res.status(502).json({
+      conectado: false,
+      error: 'No fue posible consultar los contenidos del curso'
+    });
+  }
+});
+
+// Consultar los cursos reales de Moodle
+app.get('/api/moodle/courses', async (req, res) => {
+  try {
+    const url = new URL('/webservice/rest/server.php', MOODLE_URL);
+
+    const params = new URLSearchParams({
+      wstoken: MOODLE_TOKEN,
+      wsfunction: 'core_course_get_courses',
+      moodlewsrestformat: 'json'
+    });
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: params,
+      signal: AbortSignal.timeout(10000)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Moodle respondió HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (data.exception) {
+      throw new Error(data.message || 'Error de Moodle');
+    }
+
+    if (!Array.isArray(data)) {
+      throw new Error('Respuesta inesperada de Moodle');
+    }
+
+    const cursos = data
+      .filter(curso => curso.id !== 1)
+      .map(curso => ({
+        id: curso.id,
+        nombre: curso.fullname,
+        nombreCorto: curso.shortname,
+        idCategoria: curso.categoryid,
+        visible: curso.visible,
+        resumen: curso.summary || ''
+      }));
+
+    res.json({
+      conectado: true,
+      cursos
+    });
+
+  } catch (error) {
+    console.error('Error consultando cursos de Moodle:', error.message);
+
+    res.status(502).json({
+      conectado: false,
+      error: 'No fue posible consultar los cursos de Moodle'
+    });
+  }
+});
 
 // Mock database in memory
 const PROGRAMS = [

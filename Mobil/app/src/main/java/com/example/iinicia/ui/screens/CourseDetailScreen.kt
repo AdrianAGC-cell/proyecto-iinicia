@@ -1,6 +1,20 @@
 package com.example.iinicia.ui.screens
 
 import androidx.compose.foundation.BorderStroke
+
+import android.content.Intent
+import android.widget.Toast
+import androidx.core.content.FileProvider
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import com.example.iinicia.data.IiniciaRepository
+import kotlinx.coroutines.launch
+import java.io.File
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -52,6 +66,18 @@ fun CourseDetailScreen(
     onBackClick: () -> Unit
 ) {
     val course by viewModel.selectedCourse.collectAsState()
+
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    val repository = remember {
+        IiniciaRepository(context.applicationContext)
+    }
+
+    var descargando by remember {
+        mutableStateOf(false)
+    }
+
 
     LaunchedEffect(courseId) {
         viewModel.selectCourse(courseId)
@@ -139,7 +165,81 @@ fun CourseDetailScreen(
                 // Tasks List
                 items(currentCourse.tasks) { task ->
                     Card(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(
+                                enabled = !descargando &&
+                                    task.dueDate == "resource" &&
+                                    task.status == "Disponible"
+                            ) {
+                                val cid = courseId.toLongOrNull()
+                                val mid = task.id.toLongOrNull()
+
+                                if (cid != null && mid != null) {
+                                    descargando = true
+
+                                    scope.launch {
+                                        try {
+                                            val carpeta = File(
+                                                context.cacheDir,
+                                                "moodle_pdf"
+                                            )
+
+                                            carpeta.mkdirs()
+
+                                            val destino = File.createTempFile(
+                                                "recurso_",
+                                                ".pdf",
+                                                carpeta
+                                            )
+
+                                            Toast.makeText(
+                                                context,
+                                                "Descargando PDF...",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+
+                                            val resultado = repository.descargarPdf(
+                                                cid,
+                                                mid,
+                                                destino
+                                            )
+
+                                            val pdf = resultado.getOrThrow()
+
+                                            val uri = FileProvider.getUriForFile(
+                                                context,
+                                                context.packageName + ".moodlefiles",
+                                                pdf
+                                            )
+
+                                            val intent = Intent(Intent.ACTION_VIEW).apply {
+                                                setDataAndType(uri, "application/pdf")
+                                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                            }
+
+                                            context.startActivity(intent)
+
+                                        } catch (e: kotlinx.coroutines.CancellationException) {
+                                            throw e
+                                        } catch (e: android.content.ActivityNotFoundException) {
+                                            Toast.makeText(
+                                                context,
+                                                "No tienes un visor PDF instalado",
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        } catch (e: Exception) {
+                                            Toast.makeText(
+                                                context,
+                                                "No se pudo abrir el PDF. Verifica tu sesion.",
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        } finally {
+                                            descargando = false
+                                        }
+                                    }
+                                }
+                            },
                         shape = RoundedCornerShape(14.dp),
                         colors = CardDefaults.cardColors(containerColor = CardBackground),
                         border = BorderStroke(1.dp, CardBorder)
@@ -166,7 +266,11 @@ fun CourseDetailScreen(
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = "Fecha límite: ${task.dueDate}",
+                                    text = when (task.dueDate) {
+                                        "resource" -> "Presiona para abrir el PDF"
+                                        "forum" -> "Foro de Moodle"
+                                        else -> "Tipo: ${task.dueDate}"
+                                    },
                                     fontSize = 12.sp,
                                     color = TextMuted
                                 )

@@ -1,0 +1,23 @@
+
+# Dependencias
+node_modules/
+
+# Credenciales privadas
+.env
+.env.*
+!.env.example
+
+# Archivos de respaldo
+*.bak
+*.backup-*
+Mobil-respaldo-*/
+
+# Configuracion local
+local.properties
+*.jks
+*.keystore
+
+# Compilaciones
+.gradle/
+build/
+*.apk
