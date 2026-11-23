@@ -153,7 +153,7 @@ export function configurarCursosMoodle(app) {
 
       return res.json({
         conectado: true,
-        cursoId,
+        cursoId: courseId,
         totalSecciones: secciones.length,
         secciones
       });
