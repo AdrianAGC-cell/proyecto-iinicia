@@ -15,6 +15,7 @@ import {
   Download
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { AulaVirtual } from './AulaVirtual';
 
 import { SafeImage } from '../components/common/SafeImage';
 
@@ -27,16 +28,16 @@ export const MiIinicia: React.FC = () => {
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [courseError, setCourseError] = useState('');
+  const [aulaSeleccionada, setAulaSeleccionada] = useState<Course | null>(null);
 
   useEffect(() => {
     const loadMoodleCourses = async () => {
       try {
         setLoading(true);
 
-        let response = await fetch('/api/auth/courses', { credentials: 'include' });
-        if (!response.ok) {
-          response = await fetch('/api/moodle/courses', { credentials: 'include' });
-        }
+        const response = await fetch('/api/auth/courses', {
+          credentials: 'include'
+        });
 
         if (!response.ok) {
           throw new Error('Error consultando Moodle');
@@ -56,7 +57,7 @@ export const MiIinicia: React.FC = () => {
           progress: c.progress != null ? Math.round(Number(c.progress) * 100) : 0,
           pendingTasks: 0,
           nextDeadline: '',
-          grade: 95,
+          grade: 0,
           moodleCourseId: c.id,
           color: 'from-blue-600 to-indigo-700'
         }));
@@ -64,59 +65,10 @@ export const MiIinicia: React.FC = () => {
         setCourses(mapped);
         setCourseError('');
       } catch (error) {
-        // Modo continuidad / offline cuando el servidor de Moodle se aloja en otra máquina
-        const fallbackCourses: Course[] = [
-          {
-            id: 'c-01',
-            code: 'IA-401',
-            name: 'Redes Neuronales y Deep Learning con PyTorch',
-            professor: 'Dr. Alejandro Méndez Vargas',
-            progress: 78,
-            pendingTasks: 1,
-            nextDeadline: '28 Octubre, 23:59',
-            grade: 95,
-            moodleCourseId: 2,
-            color: 'from-blue-600 to-indigo-700'
-          },
-          {
-            id: 'c-02',
-            code: 'IA-402',
-            name: 'Cloud Computing & MLOps con Docker y Kubernetes',
-            professor: 'Mtra. Elena Saldaña',
-            progress: 64,
-            pendingTasks: 1,
-            nextDeadline: '29 Octubre, 18:00',
-            grade: 88,
-            moodleCourseId: 3,
-            color: 'from-cyan-600 to-blue-700'
-          },
-          {
-            id: 'c-03',
-            code: 'IA-403',
-            name: 'Machine Learning II: Algoritmos No Supervisados',
-            professor: 'Dr. Fernando Quiroz',
-            progress: 85,
-            pendingTasks: 1,
-            nextDeadline: '02 Noviembre',
-            grade: 92,
-            moodleCourseId: 4,
-            color: 'from-indigo-600 to-violet-700'
-          },
-          {
-            id: 'c-04',
-            code: 'IA-404',
-            name: 'Optimización Numérica y Algoritmos Genéticos',
-            professor: 'Dra. Carmen Villalobos',
-            progress: 70,
-            pendingTasks: 1,
-            nextDeadline: 'Hoy, 23:59',
-            grade: 95,
-            moodleCourseId: 5,
-            color: 'from-teal-600 to-cyan-700'
-          }
-        ];
-        setCourses(fallbackCourses);
-        setCourseError('Modo Continuidad Académica: Conexión con servidor Moodle en espera.');
+        setCourses([]);
+        setCourseError(
+          'No se pudieron cargar tus cursos de Moodle. Verifica tu sesión e inténtalo nuevamente.'
+        );
       } finally {
         setLoading(false);
       }
@@ -310,7 +262,15 @@ export const MiIinicia: React.FC = () => {
       </div>
 
       {/* TAB CONTENT: CURSOS */}
-      {activeTab === 'cursos' && (
+      {activeTab === 'cursos' && aulaSeleccionada && (
+        <AulaVirtual
+          courseId={Number(aulaSeleccionada.moodleCourseId)}
+          courseName={aulaSeleccionada.name}
+          onBack={() => setAulaSeleccionada(null)}
+        />
+      )}
+
+      {activeTab === 'cursos' && !aulaSeleccionada && (
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-black text-slate-900">
@@ -368,15 +328,11 @@ export const MiIinicia: React.FC = () => {
                 <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
                   <div className="text-xs">
                     <span className="text-slate-500 block">Promedio parcial:</span>
-                    <span className="font-black text-[#22abe2] text-sm">{course.grade ? `${course.grade}/100` : 'En curso'}</span>
+                    <span className="font-black text-[#22abe2] text-sm">{course.grade > 0 ? `${course.grade}/100` : 'Sin calificación'}</span>
                   </div>
 
                   <button
-                    onClick={() => window.open(
-                      'http://localhost:8080/course/view.php?id=' + course.moodleCourseId,
-                      '_blank',
-                      'noopener,noreferrer'
-                    )}
+                    onClick={() => setAulaSeleccionada(course)}
                     className="px-4 py-2 rounded-xl bg-[#22abe2] hover:bg-[#1b9ad0] text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
                   >
                     <span>Ir al aula virtual</span>

@@ -408,10 +408,11 @@ class IiniciaRepository(context: Context) {
                             MoodleTaskDto(
                                 id = actividad.id.toString(),
                                 courseId = courseId,
-                                title = "${seccion.nombre}: ${actividad.nombre}",
+                                title = actividad.nombre,
                                 dueDate = actividad.tipo,
                                 status = if (actividad.visible == 1) "Disponible" else "Oculta",
-                                grade = matchedGrade
+                                grade = matchedGrade,
+                                sectionName = seccion.nombre
                             )
                         }
                     }

@@ -31,6 +31,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -158,7 +160,7 @@ fun CourseDetailScreen(
                 // Section Title: Activities
                 item {
                     Text(
-                        text = "Actividades y Tareas Moodle",
+                        text = "Contenido del curso",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         color = NavyPrimary,
@@ -166,12 +168,25 @@ fun CourseDetailScreen(
                     )
                 }
 
-                // Tasks List
-                items(currentCourse.tasks) { task ->
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable(enabled = !descargando) {
+                // Actividades agrupadas por sección de Moodle
+                val secciones = currentCourse.tasks.groupBy {
+                    it.sectionName.ifBlank { "General" }
+                }
+
+                secciones.forEach { (nombreSeccion, actividades) ->
+                    item {
+                        Text(
+                            text = nombreSeccion,
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = NavyPrimary,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+                    }
+
+                    items(actividades) { task ->
+                        val abrirActividad: () -> Unit = {
+
                                 if (task.dueDate == "resource" && task.status == "Disponible") {
                                     val cid = courseId.toLongOrNull()
                                     val mid = task.id.toLongOrNull()
@@ -243,7 +258,11 @@ fun CourseDetailScreen(
                                 } else {
                                     selectedActivityDialog = task
                                 }
-                            },
+                        }
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(enabled = !descargando, onClick = abrirActividad),
                         shape = RoundedCornerShape(14.dp),
                         colors = CardDefaults.cardColors(containerColor = CardBackground),
                         border = BorderStroke(1.dp, CardBorder)
@@ -287,6 +306,18 @@ fun CourseDetailScreen(
                                     )
                                 }
                             }
+                            if (task.dueDate == "resource" && task.status == "Disponible") {
+                                androidx.compose.material3.Button(
+                                    onClick = abrirActividad,
+                                    enabled = !descargando,
+                                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                                        containerColor = BrightBlue
+                                    )
+                                ) {
+                                    Text("Abrir PDF", color = Color.White)
+                                }
+                            }
+
                             // Status badge
                             Text(
                                 text = task.status,
@@ -296,6 +327,7 @@ fun CourseDetailScreen(
                             )
                         }
                     }
+                }
                 }
             }
         }

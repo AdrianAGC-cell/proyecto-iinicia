@@ -38,7 +38,8 @@ data class MoodleTaskDto(
     val title: String = "",
     val dueDate: String = "",
     val status: String = "",
-    val grade: String? = null
+    val grade: String? = null,
+    val sectionName: String = ""
 )
 
 data class NotificationDto(
