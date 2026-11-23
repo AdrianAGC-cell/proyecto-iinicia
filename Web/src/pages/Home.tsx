@@ -189,9 +189,9 @@ export const Home: React.FC = () => {
                 {/* Simulated Student Portal Header inside Showcase */}
                 <div className="flex items-center gap-3.5 bg-white/5 p-3.5 rounded-2xl border border-white/10 mb-4">
                   <SafeImage
-                    src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80"
                     alt="Valeria Morales"
                     isAvatar={true}
+                    avatarInitials="VM"
                     className="w-12 h-12 rounded-xl object-cover ring-2 ring-[#22abe2]"
                   />
                   <div className="space-y-0.5">

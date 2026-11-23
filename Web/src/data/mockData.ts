@@ -10,7 +10,7 @@ export const DEMO_USERS: Record<string, User> = {
     programId: 'lic-ia-datos',
     programName: 'Licenciatura en Inteligencia Artificial y Ciencia de Datos',
     semester: 4,
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+    avatar: undefined,
     moodleId: 1042
   },
   aspirante: {
@@ -20,28 +20,28 @@ export const DEMO_USERS: Record<string, User> = {
     role: 'aspirante',
     programId: 'ing-software-cloud',
     programName: 'Ingeniería en Desarrollo de Software y Arquitectura Cloud',
-    avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=200&q=80'
+    avatar: undefined
   },
   profesor: {
     id: 'usr-doc-03',
     name: 'Dr. Alejandro Méndez Vargas',
     email: 'alejandro.mendez@iinicia.edu.mx',
     role: 'profesor',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80'
+    avatar: undefined
   },
   coordinador: {
     id: 'usr-coord-04',
     name: 'Dra. Sofía Alarcón Ruiz',
     email: 'sofia.alarcon@iinicia.edu.mx',
     role: 'coordinador',
-    avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=200&q=80'
+    avatar: undefined
   },
   admin: {
     id: 'usr-adm-05',
     name: 'Ing. Roberto Peña Guzmán',
     email: 'admin.sistemas@iinicia.edu.mx',
     role: 'admin',
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80'
+    avatar: undefined
   }
 };
 

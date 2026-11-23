@@ -1,6 +1,5 @@
 package com.example.iinicia.ui.screens
 
-import android.util.Patterns
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -14,14 +13,19 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -55,6 +59,11 @@ fun LoginScreen(
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var showRegisterDialog by remember { mutableStateOf(false) }
+
+    var regName by remember { mutableStateOf("") }
+    var regEmail by remember { mutableStateOf("") }
+    var regPassword by remember { mutableStateOf("") }
 
     val authState by authViewModel.authState.collectAsState()
 
@@ -107,7 +116,57 @@ fun LoginScreen(
                     textAlign = TextAlign.Center
                 )
 
-                Spacer(modifier = Modifier.height(18.dp))
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Google Sign In Button
+                Button(
+                    onClick = { authViewModel.loginWithGoogle() },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(46.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.White,
+                        contentColor = Color(0xFF1E293B)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = "G",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Black,
+                            color = Color(0xFF4285F4)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Continuar con Google",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF1E293B)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Separator
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    HorizontalDivider(modifier = Modifier.weight(1f), color = Color(0xFF334155))
+                    Text(
+                        text = "  o con usuario institucional  ",
+                        fontSize = 10.sp,
+                        color = Color(0xFF94A3B8)
+                    )
+                    HorizontalDivider(modifier = Modifier.weight(1f), color = Color(0xFF334155))
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
 
                 OutlinedTextField(
                     value = email,
@@ -144,7 +203,7 @@ fun LoginScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(18.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
                 // Login Button
                 Button(
@@ -174,30 +233,79 @@ fun LoginScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-
+                // Register Link
+                TextButton(
+                    onClick = { showRegisterDialog = true }
+                ) {
+                    Text(
+                        text = "¿No tienes cuenta? Registrarme como aspirante",
+                        fontSize = 12.sp,
+                        color = CyanAccent,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             }
         }
     }
-}
 
-@Composable
-fun QuickLoginChip(
-    role: String,
-    name: String,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    Box(
-        modifier = modifier
-            .background(Color(0xFF1E293B), RoundedCornerShape(10.dp))
-            .clickable { onClick() }
-            .padding(vertical = 8.dp, horizontal = 10.dp)
-    ) {
-        Column {
-            Text(text = role, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = CyanAccent)
-            Text(text = name, fontSize = 9.sp, color = Color(0xFF94A3B8), maxLines = 1)
-        }
+    // Modal de Registro Rápido en Android
+    if (showRegisterDialog) {
+        AlertDialog(
+            onDismissRequest = { showRegisterDialog = false },
+            title = {
+                Text(
+                    text = "Crear Cuenta Aspirante",
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(
+                        value = regName,
+                        onValueChange = { regName = it },
+                        label = { Text("Nombre Completo") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = regEmail,
+                        onValueChange = { regEmail = it },
+                        label = { Text("Correo Electrónico") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = regPassword,
+                        onValueChange = { regPassword = it },
+                        label = { Text("Contraseña (mínimo 6 car.)") },
+                        visualTransformation = PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (regEmail.isNotBlank()) {
+                            showRegisterDialog = false
+                            authViewModel.register(regName, regEmail.trim(), regPassword)
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = CyanBright)
+                ) {
+                    Text("Registrarme", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showRegisterDialog = false }) {
+                    Text("Cancelar", color = TextMuted)
+                }
+            },
+            containerColor = CardBackgroundDark
+        )
     }
 }

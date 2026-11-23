@@ -166,17 +166,29 @@ export const MiIinicia: React.FC = () => {
             <div className="space-y-1">
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-[#22abe2]/20 text-[#7dd3f1] border border-[#22abe2]/30">
-                  Estudiante Regular • {user?.semester || 4}to Semestre
+                  {user?.role === 'profesor'
+                    ? 'Cuerpo Docente • Profesor Titular'
+                    : user?.role === 'coordinador'
+                    ? 'Coordinación Académica'
+                    : user?.role === 'admin'
+                    ? 'Administrador TI'
+                    : user?.role === 'aspirante'
+                    ? 'Aspirante en Admisión'
+                    : `Estudiante Regular • ${user?.semester || 1}er Semestre`}
                 </span>
                 <span className="text-xs text-slate-400 font-mono">
-                  Matrícula: {user?.matricula || 'IIN-2024-8842'}
+                  {user?.matricula 
+                    ? `Identificador: ${user.matricula}` 
+                    : user?.role === 'profesor' 
+                    ? 'Clave Docente: DOC-2026-104' 
+                    : `Matrícula: IIN-2026-${user?.id?.slice(0, 4) || '8842'}`}
                 </span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
-                {user?.name || 'Valeria Morales Santillán'}
+                {user?.name || 'Usuario IINICIA'}
               </h1>
               <p className="text-xs sm:text-sm text-slate-300">
-                {user?.programName || 'Licenciatura en Inteligencia Artificial y Ciencia de Datos'}
+                {user?.programName || (user?.role === 'profesor' ? 'Facultad de Inteligencia Artificial y Tecnologías Emergentes' : 'Licenciatura en Inteligencia Artificial y Ciencia de Datos')}
               </p>
             </div>
           </div>

@@ -1,3 +1,8 @@
 
 # Credenciales privadas del backend
 /server/.env
+.vercel
+
+node_modules/
+dist/
+.vercel

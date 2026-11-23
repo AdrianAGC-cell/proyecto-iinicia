@@ -32,15 +32,19 @@ export const SafeImage: React.FC<SafeImageProps> = ({
     setIsLoading(false);
   };
 
-  // If error and it is an avatar, show initial avatar badge
-  if (hasError && isAvatar) {
-    const initials = avatarInitials || (alt ? alt.slice(0, 2).toUpperCase() : 'IN');
+  // If no source or error, and it is an avatar, show generic user badge with initials
+  if ((!src || hasError) && isAvatar) {
+    const initials = avatarInitials || (alt ? alt.trim().slice(0, 2).toUpperCase() : '');
     return (
       <div 
         className={`flex items-center justify-center font-bold text-white bg-gradient-to-br from-[#22abe2] to-[#1283af] select-none ${className}`}
-        title={alt}
+        title={alt || 'Usuario'}
       >
-        <span>{initials}</span>
+        {initials ? (
+          <span className="text-xs uppercase tracking-wider">{initials}</span>
+        ) : (
+          <UserIcon className="w-1/2 h-1/2 text-white/90" />
+        )}
       </div>
     );
   }
