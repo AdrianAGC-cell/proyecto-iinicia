@@ -13,6 +13,7 @@ import androidx.navigation.navArgument
 import com.example.iinicia.ui.screens.CourseDetailScreen
 import com.example.iinicia.ui.screens.DashboardScreen
 import com.example.iinicia.ui.screens.LoginScreen
+import com.example.iinicia.ui.screens.MoodleScreen
 import com.example.iinicia.ui.screens.NotificationsScreen
 import com.example.iinicia.ui.screens.ProfileScreen
 import com.example.iinicia.viewmodel.AuthViewModel
@@ -53,11 +54,7 @@ fun IiniciaNavGraph() {
                     navController.navigate("notifications")
                 },
                 onMoodleSsoClick = {
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://moodle.iinicia.org/login/index.php"))
-                    try {
-                        localContext.startActivity(intent)
-                    } catch (_: Exception) {
-                    }
+                    navController.navigate("moodleScreen")
                 }
             )
         }
@@ -90,6 +87,12 @@ fun IiniciaNavGraph() {
         composable("notifications") {
             NotificationsScreen(
                 viewModel = dashboardViewModel,
+                onBackClick = { navController.popBackStack() }
+            )
+        }
+
+        composable("moodleScreen") {
+            MoodleScreen(
                 onBackClick = { navController.popBackStack() }
             )
         }

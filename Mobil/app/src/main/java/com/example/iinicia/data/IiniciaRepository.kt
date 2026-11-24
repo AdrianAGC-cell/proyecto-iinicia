@@ -179,25 +179,42 @@ class IiniciaRepository(context: Context) {
                 return Result.success(LoginResponse(token = token, user = applicantUser))
             }
 
-            // 3. VULN-008 FIX: Fallback controlado únicamente para cuentas demo institucionales conocidas
+            // 3. VULN-008 FIX: Fallback controlado para cuentas institucionales oficiales
             val demoAccounts = mapOf(
                 "admin.sistemas@iinicia.edu.mx" to "Admin TI",
+                "coordinador@iinicia.edu.mx" to "Coordinador",
                 "sofia.alarcon@iinicia.edu.mx" to "Coordinador",
+                "profesor@iinicia.edu.mx" to "Profesor",
                 "alejandro.mendez@iinicia.edu.mx" to "Profesor",
                 "valeria.morales@iinicia.edu.mx" to "Estudiante",
                 "diego.solis@gmail.com" to "Aspirante"
             )
             val fallbackRole = demoAccounts[cleanEmail] ?: "Estudiante"
-            val fallbackName = cleanEmail.substringBefore("@")
-                .split(".", "_", "-")
-                .joinToString(" ") { part -> part.replaceFirstChar { it.uppercase() } }
+            val fallbackMoodleId = when (fallbackRole) {
+                "Admin TI" -> "ADM-2020-001"
+                "Coordinador" -> "COORD-2021-004"
+                "Profesor" -> "DOC-2026-104"
+                "Estudiante" -> "IIN-2024-8842"
+                "Aspirante" -> "SOL-2026-4412"
+                else -> "MOODLE-${cleanEmail.substringBefore("@").uppercase()}"
+            }
+            val fallbackName = when (cleanEmail) {
+                "admin.sistemas@iinicia.edu.mx" -> "Ing. Roberto Peña Guzmán"
+                "coordinador@iinicia.edu.mx", "sofia.alarcon@iinicia.edu.mx" -> "Dra. Sofía Alarcón Ruiz"
+                "profesor@iinicia.edu.mx", "alejandro.mendez@iinicia.edu.mx" -> "Dr. Alejandro Méndez Vargas"
+                "valeria.morales@iinicia.edu.mx" -> "Valeria Morales Santillán"
+                "diego.solis@gmail.com" -> "Diego Solís"
+                else -> cleanEmail.substringBefore("@")
+                    .split(".", "_", "-")
+                    .joinToString(" ") { part -> part.replaceFirstChar { it.uppercase() } }
+            }
 
             val fallbackUser = UserDto(
                 id = cleanEmail,
                 name = fallbackName,
                 email = cleanEmail,
                 role = fallbackRole,
-                moodleId = "MOODLE-${cleanEmail.substringBefore("@").uppercase()}"
+                moodleId = fallbackMoodleId
             )
             tokenManager.saveToken(token)
             tokenManager.saveUser(fallbackUser)

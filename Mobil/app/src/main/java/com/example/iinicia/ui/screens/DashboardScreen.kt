@@ -50,7 +50,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.iinicia.ui.components.InstitutionalHeader
-import com.example.iinicia.ui.components.RoleSimulationBar
 import com.example.iinicia.ui.theme.CardBackgroundDark
 import com.example.iinicia.ui.theme.CardBorderDark
 import com.example.iinicia.ui.theme.CyanAccent
@@ -75,24 +74,14 @@ fun DashboardScreen(
     val notifications by dashboardViewModel.notifications.collectAsState()
 
     var searchQuery by remember { mutableStateOf("") }
-    var currentRole by remember { mutableStateOf(user.role) }
 
     Scaffold(
         topBar = {
-            Column {
-                InstitutionalHeader(
-                    userName = user.name,
-                    onProfileClick = onProfileClick,
-                    onMoodleSsoClick = onMoodleSsoClick
-                )
-                RoleSimulationBar(
-                    currentRole = user.role,
-                    onRoleSelected = { role ->
-                        currentRole = role
-                        dashboardViewModel.switchRole(role)
-                    }
-                )
-            }
+            InstitutionalHeader(
+                userName = user.name,
+                onProfileClick = onProfileClick,
+                onMoodleSsoClick = onMoodleSsoClick
+            )
         },
         bottomBar = {
             NavigationBar(containerColor = CardBackgroundDark) {

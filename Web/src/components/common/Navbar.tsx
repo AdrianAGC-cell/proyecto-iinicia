@@ -8,18 +8,13 @@ import {
   LogOut, 
   LayoutDashboard, 
   Sparkles,
-  ChevronDown,
-  GraduationCap,
-  UserCheck,
-  ShieldCheck,
-  Users
+  ChevronDown
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { Role } from '../../types';
 import { SafeImage } from './SafeImage';
 
 export const Navbar: React.FC = () => {
-  const { user, isAuthenticated, logout, switchRole, triggerMoodleSSO } = useAuth();
+  const { user, isAuthenticated, logout, triggerMoodleSSO } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const location = useLocation();
@@ -33,18 +28,6 @@ export const Navbar: React.FC = () => {
     { label: 'Noticias', path: '/noticias' },
     { label: 'Contacto', path: '/contacto' },
   ];
-
-  const handleRoleChange = (role: Role) => {
-    switchRole(role);
-    setUserDropdownOpen(false);
-    if (role === 'estudiante') {
-      navigate('/mi-iinicia');
-    } else if (role === 'coordinador' || role === 'admin') {
-      navigate('/admin');
-    } else if (role === 'aspirante') {
-      navigate('/admisiones');
-    }
-  };
 
   const isActive = (path: string) => {
     if (path === '/' && location.pathname !== '/') return false;
@@ -70,65 +53,9 @@ export const Navbar: React.FC = () => {
             </span>
           </div>
 
-          {/* VULN-004 FIX: Role switcher only visible in development (DEV) mode.
-              In production, this panel is hidden to prevent privilege escalation. */}
-          {import.meta.env.DEV && (
-            <div className="flex items-center gap-1.5 text-[11px] bg-slate-900/90 p-1 rounded-xl border border-slate-800">
-              <span className="text-slate-400 hidden lg:inline px-1.5 font-medium">Simular rol:</span>
-
-              <button
-                onClick={() => handleRoleChange('estudiante')}
-                title="Ver portal como Estudiante Regular (Valeria Morales)"
-                className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all duration-200 flex items-center gap-1 cursor-pointer ${
-                  user?.role === 'estudiante'
-                    ? 'bg-[#22abe2] text-white shadow-md shadow-[#22abe2]/30 scale-[1.02]'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
-                }`}
-              >
-                <GraduationCap className="w-3 h-3" />
-                <span>Estudiante</span>
-              </button>
-
-              <button
-                onClick={() => handleRoleChange('aspirante')}
-                title="Ver portal como Aspirante en Proceso (Diego Solís)"
-                className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all duration-200 flex items-center gap-1 cursor-pointer ${
-                  user?.role === 'aspirante'
-                    ? 'bg-[#22abe2] text-white shadow-md shadow-[#22abe2]/30 scale-[1.02]'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
-                }`}
-              >
-                <UserCheck className="w-3 h-3" />
-                <span>Aspirante</span>
-              </button>
-
-              <button
-                onClick={() => handleRoleChange('coordinador')}
-                title="Ver portal como Coordinador Académico (Dra. Sofía Alarcón)"
-                className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all duration-200 flex items-center gap-1 cursor-pointer ${
-                  user?.role === 'coordinador'
-                    ? 'bg-[#22abe2] text-white shadow-md shadow-[#22abe2]/30 scale-[1.02]'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
-                }`}
-              >
-                <Users className="w-3 h-3" />
-                <span>Coordinador</span>
-              </button>
-
-              <button
-                onClick={() => handleRoleChange('admin')}
-                title="Ver portal como Administrador TI (Ing. Roberto Peña)"
-                className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all duration-200 flex items-center gap-1 cursor-pointer ${
-                  user?.role === 'admin'
-                    ? 'bg-[#22abe2] text-white shadow-md shadow-[#22abe2]/30 scale-[1.02]'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
-                }`}
-              >
-                <ShieldCheck className="w-3 h-3" />
-                <span>Admin TI</span>
-              </button>
-            </div>
-          )}
+          <div className="hidden md:flex items-center gap-3 text-xs text-slate-300">
+            <span>Portal Oficial Universitario</span>
+          </div>
         </div>
       </div>
 

@@ -56,7 +56,7 @@ export const SUPABASE_ANON_KEY =
 **OWASP:** A02:2021 – Cryptographic Failures  
 **CVSS:** 7.5 (Alto)
 
-**Corrección recomendada:**
+**Corrección recomendada:** 
 ```typescript
 // ✅ CORRECTO - nunca un fallback con valor real:
 export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;

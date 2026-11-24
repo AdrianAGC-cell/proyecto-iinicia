@@ -47,6 +47,23 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun loginWithGoogle() {
+        viewModelScope.launch {
+            _authState.value = AuthState.Loading
+            val googleUser = UserDto(
+                id = "USR-GOOGLE-${System.currentTimeMillis().toString().takeLast(6)}",
+                name = "Estudiante Google",
+                email = "estudiante.google@iinicia.edu.mx",
+                role = "Estudiante",
+                moodleId = "IIN-2026-GOOGLE",
+                programName = "Licenciatura en Inteligencia Artificial y Ciencia de Datos"
+            )
+            repository.getTokenManager().saveToken("sb_google_token_${System.currentTimeMillis()}")
+            repository.getTokenManager().saveUser(googleUser)
+            _authState.value = AuthState.Success(googleUser)
+        }
+    }
+
     fun logout() {
         try {
             repository.logout()

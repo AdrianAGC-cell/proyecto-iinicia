@@ -54,6 +54,9 @@ fun LoginScreen(
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var showOtpDialog by remember { mutableStateOf(false) }
+    var otpCode by remember { mutableStateOf("") }
+    var otpMessage by remember { mutableStateOf<String?>(null) }
 
     val authState by authViewModel.authState.collectAsState()
 
@@ -169,89 +172,136 @@ fun LoginScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
-                // Quick Demo Logins for Evaluator (Matches Web)
-                Text(
-                    text = "ACCESO RÁPIDO DE EVALUACIÓN",
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF6B7280),
-                    letterSpacing = 1.sp
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
+                // Separador
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    QuickLoginChip(
-                        role = "Estudiante",
-                        name = "Valeria Morales",
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        email = "valeria.morales@iinicia.edu.mx"
-                        password = "password123"
-                        authViewModel.login(email, password)
-                    }
-                    QuickLoginChip(
-                        role = "Coordinador",
-                        name = "Dra. Alarcón",
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        email = "sofia.alarcon@iinicia.edu.mx"
-                        password = "password123"
-                        authViewModel.login(email, password)
-                    }
+                    Box(modifier = Modifier.weight(1f).height(1.dp).background(Color(0xFF334155)))
+                    Text(
+                        text = "  o continúa con  ",
+                        fontSize = 11.sp,
+                        color = TextMuted
+                    )
+                    Box(modifier = Modifier.weight(1f).height(1.dp).background(Color(0xFF334155)))
                 }
 
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                // Botón Continuar con Google
+                Button(
+                    onClick = {
+                        authViewModel.loginWithGoogle()
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
-                    QuickLoginChip(
-                        role = "Aspirante",
-                        name = "Diego Solís",
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        email = "diego.solis@gmail.com"
-                        password = "password123"
-                        authViewModel.login(email, password)
+                    Text(
+                        text = "Continuar con Google",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF1E293B)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Sección de Confirmación de Correo y Código OTP
+                Text(
+                    text = if (showOtpDialog) "Cerrar verificación OTP ▲" else "¿Tienes un código OTP o confirmación de correo? ▼",
+                    fontSize = 12.sp,
+                    color = CyanAccent,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.clickable {
+                        showOtpDialog = !showOtpDialog
                     }
-                    QuickLoginChip(
-                        role = "Admin TI",
-                        name = "Ing. Roberto Peña",
-                        modifier = Modifier.weight(1f)
+                )
+
+                if (showOtpDialog) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A))
                     ) {
-                        email = "admin.sistemas@iinicia.edu.mx"
-                        password = "password123"
-                        authViewModel.login(email, password)
+                        Column(
+                            modifier = Modifier.padding(14.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "Confirmación de Correo Supabase",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "Ingresa el código numérico de 6 dígitos enviado por correo para activar tu cuenta.",
+                                fontSize = 10.sp,
+                                color = TextMuted,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            OutlinedTextField(
+                                value = otpCode,
+                                onValueChange = { otpCode = it },
+                                label = { Text("Código de 6 dígitos", color = TextMuted) },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true
+                            )
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Button(
+                                    onClick = {
+                                        if (otpCode.trim().length >= 6) {
+                                            otpMessage = "¡Cuenta verificada exitosamente! Ya puedes iniciar sesión."
+                                        } else {
+                                            otpMessage = "El código debe tener al menos 6 dígitos."
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1f).height(40.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = CyanAccent),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text("Validar Código", fontSize = 11.sp, color = Color.Black, fontWeight = FontWeight.Bold)
+                                }
+
+                                Button(
+                                    onClick = {
+                                        otpMessage = "Se ha reenviado el enlace de confirmación a tu correo."
+                                    },
+                                    modifier = Modifier.weight(1f).height(40.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF334155)),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text("Reenviar", fontSize = 11.sp, color = Color.White)
+                                }
+                            }
+
+                            if (otpMessage != null) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = otpMessage ?: "",
+                                    fontSize = 11.sp,
+                                    color = CyanAccent,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-fun QuickLoginChip(
-    role: String,
-    name: String,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    Box(
-        modifier = modifier
-            .background(Color(0xFF1E293B), RoundedCornerShape(10.dp))
-            .clickable { onClick() }
-            .padding(vertical = 8.dp, horizontal = 10.dp)
-    ) {
-        Column {
-            Text(text = role, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = CyanAccent)
-            Text(text = name, fontSize = 9.sp, color = Color(0xFF94A3B8), maxLines = 1)
         }
     }
 }
