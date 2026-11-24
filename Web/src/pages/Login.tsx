@@ -18,25 +18,43 @@ export const Login: React.FC = () => {
     setLoading(true);
     setErrorMessage(null);
 
-    // Validar si el usuario está registrado en Supabase Auth y tiene el correo sin confirmar
+    const cleanEmail = email.trim();
+    if (!cleanEmail || !password) {
+      setErrorMessage('Por favor ingresa tu correo y contraseña.');
+      setLoading(false);
+      return;
+    }
+
+    // VULN-002 FIX: Validar con Supabase Auth
     try {
       const { error: authError } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
+        email: cleanEmail,
         password: password
       });
 
-      if (authError && authError.message.toLowerCase().includes('email not confirmed')) {
-        setErrorMessage('Tu correo no ha sido confirmado. Por favor revisa tu bandeja de entrada o correo no deseado (Spam) para activarlo.');
-        setLoading(false);
-        return;
+      if (authError) {
+        if (authError.message.toLowerCase().includes('email not confirmed')) {
+          setErrorMessage('Tu correo no ha sido confirmado. Por favor revisa tu bandeja de entrada o correo no deseado (Spam) para activarlo.');
+          setLoading(false);
+          return;
+        }
+        if (authError.message.toLowerCase().includes('invalid login credentials')) {
+          setErrorMessage('Credenciales inválidas. Verifica tu correo y contraseña.');
+          setLoading(false);
+          return;
+        }
       }
     } catch (e) {
-      // Si falla auth, continúa al login de base de datos
+      console.warn('[IINICIA Auth] Supabase Auth check notice:', e);
     }
 
-    await login(email, undefined, password);
+    const success = await login(cleanEmail, undefined, password);
     setLoading(false);
-    navigate('/mi-iinicia');
+    if (success) {
+      navigate('/mi-iinicia');
+    } else {
+      setErrorMessage('No se encontró un usuario con esas credenciales o la cuenta requiere verificación.');
+    }
   };
 
   const handleQuickDemoLogin = async (role: Role, demoEmail: string) => {

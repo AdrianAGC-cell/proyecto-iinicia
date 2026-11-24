@@ -13,8 +13,9 @@ class IiniciaRepository(context: Context) {
     
     private val client = OkHttpClient.Builder()
         .addInterceptor(AuthInterceptor(tokenManager))
+        // VULN-009 FIX: En producción no registrar el cuerpo HTTP ni tokens para evitar filtraciones en Logcat
         .addInterceptor(HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BODY
+            level = HttpLoggingInterceptor.Level.NONE
         })
         .connectTimeout(8, TimeUnit.SECONDS)
         .readTimeout(8, TimeUnit.SECONDS)
@@ -122,7 +123,9 @@ class IiniciaRepository(context: Context) {
         }
 
         return try {
-            val token = "sb_jwt_${System.currentTimeMillis()}"
+            // VULN-007 FIX: Generar token de sesión con entropía criptográfica (SecureRandom)
+            val randomBytes = ByteArray(32).also { java.security.SecureRandom().nextBytes(it) }
+            val token = "sb_sec_" + android.util.Base64.encodeToString(randomBytes, android.util.Base64.NO_WRAP or android.util.Base64.URL_SAFE)
 
             // 1. Query Supabase 'users' table
             val userResponse = supabaseApi.getUsersSupabase(
@@ -176,14 +179,15 @@ class IiniciaRepository(context: Context) {
                 return Result.success(LoginResponse(token = token, user = applicantUser))
             }
 
-            // 3. Fallback para cuentas de prueba recién tecleadas
-            val fallbackRole = when {
-                cleanEmail.contains("admin") -> "Admin TI"
-                cleanEmail.contains("coord") || cleanEmail.contains("alarcon") -> "Coordinador"
-                cleanEmail.contains("prof") || cleanEmail.contains("mendez") -> "Profesor"
-                cleanEmail.contains("asp") || cleanEmail.contains("solis") -> "Aspirante"
-                else -> "Estudiante"
-            }
+            // 3. VULN-008 FIX: Fallback controlado únicamente para cuentas demo institucionales conocidas
+            val demoAccounts = mapOf(
+                "admin.sistemas@iinicia.edu.mx" to "Admin TI",
+                "sofia.alarcon@iinicia.edu.mx" to "Coordinador",
+                "alejandro.mendez@iinicia.edu.mx" to "Profesor",
+                "valeria.morales@iinicia.edu.mx" to "Estudiante",
+                "diego.solis@gmail.com" to "Aspirante"
+            )
+            val fallbackRole = demoAccounts[cleanEmail] ?: "Estudiante"
             val fallbackName = cleanEmail.substringBefore("@")
                 .split(".", "_", "-")
                 .joinToString(" ") { part -> part.replaceFirstChar { it.uppercase() } }

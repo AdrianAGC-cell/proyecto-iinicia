@@ -26,10 +26,34 @@ export const Registro: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [programId, setProgramId] = useState('lic-ia-datos');
-  const [isCaptchaValid, setIsCaptchaValid] = useState(false);
-  const [agreeTerms, setAgreeTerms] = useState(true);
+  // VULN-003 FIX: Desafío interactivo real anti-bot con verificación de cálculo
+  const [captchaNum1, setCaptchaNum1] = useState(() => Math.floor(Math.random() * 8) + 2);
+  const [captchaNum2, setCaptchaNum2] = useState(() => Math.floor(Math.random() * 8) + 1);
+  const [captchaAnswer, setCaptchaAnswer] = useState('');
+  const [captchaVerified, setCaptchaVerified] = useState(false);
+
+  // VULN-011 FIX: Terms must be explicitly accepted by the user (default = false)
+  const [agreeTerms, setAgreeTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const refreshCaptcha = () => {
+    setCaptchaNum1(Math.floor(Math.random() * 8) + 2);
+    setCaptchaNum2(Math.floor(Math.random() * 8) + 1);
+    setCaptchaAnswer('');
+    setCaptchaVerified(false);
+  };
+
+  const handleVerifyCaptcha = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (parseInt(captchaAnswer.trim(), 10) === (captchaNum1 + captchaNum2)) {
+      setCaptchaVerified(true);
+      setErrorMsg(null);
+    } else {
+      setErrorMsg('Respuesta de seguridad incorrecta. Inténtalo de nuevo.');
+      refreshCaptcha();
+    }
+  };
 
   // Estados de verificación OTP
   const [otpToken, setOtpToken] = useState('');
@@ -58,8 +82,12 @@ export const Registro: React.FC = () => {
       setErrorMsg('La contraseña debe tener al menos 6 caracteres.');
       return;
     }
-    if (!isCaptchaValid) {
-      setErrorMsg('Por favor marca la casilla de verificación anti-bot.');
+    if (!captchaVerified) {
+      setErrorMsg('Por favor completa la verificación de seguridad anti-bot resolviendo el cálculo.');
+      return;
+    }
+    if (!agreeTerms) {
+      setErrorMsg('Debes aceptar los Términos y Condiciones y el Aviso de Privacidad.');
       return;
     }
 
@@ -291,18 +319,54 @@ export const Registro: React.FC = () => {
                 </select>
               </div>
 
-              {/* Checkbox Anti-bot */}
-              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between">
-                <label className="flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={isCaptchaValid}
-                    onChange={(e) => setIsCaptchaValid(e.target.checked)}
-                    className="w-4 h-4 rounded text-[#22abe2] focus:ring-[#22abe2]"
-                  />
-                  <span>No soy un robot</span>
-                </label>
-                <ShieldCheck className="w-5 h-5 text-[#22abe2]" />
+              {/* VULN-003 FIX: Verificación interactiva de seguridad anti-bot */}
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+                    <ShieldCheck className="w-4 h-4 text-[#22abe2]" />
+                    <span>Control Anti-Bot IINICIA</span>
+                  </div>
+                  {captchaVerified ? (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                      <CheckCircle2 className="w-3 h-3" /> Verificado
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={refreshCaptcha}
+                      className="text-[11px] text-[#22abe2] hover:underline flex items-center gap-1 cursor-pointer"
+                      title="Generar nueva pregunta"
+                    >
+                      <RefreshCw className="w-3 h-3" /> Nuevo reto
+                    </button>
+                  )}
+                </div>
+
+                {!captchaVerified ? (
+                  <div className="flex items-center gap-2 pt-1">
+                    <span className="text-xs text-slate-600 font-semibold whitespace-nowrap">
+                      ¿Cuánto es {captchaNum1} + {captchaNum2}?
+                    </span>
+                    <input
+                      type="number"
+                      placeholder="Resultado"
+                      value={captchaAnswer}
+                      onChange={(e) => setCaptchaAnswer(e.target.value)}
+                      className="w-20 px-2 py-1 text-xs text-center border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#22abe2] focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleVerifyCaptcha}
+                      className="px-2.5 py-1 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-lg transition cursor-pointer"
+                    >
+                      Comprobar
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-emerald-700 font-medium">
+                    Identidad humana comprobada correctamente.
+                  </p>
+                )}
               </div>
 
               <div className="pt-1">

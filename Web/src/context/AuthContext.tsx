@@ -19,12 +19,15 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Restore saved user or default to null
+  // VULN-006 FIX: Use sessionStorage instead of plaintext localStorage
+  // This ensures sessions do not linger indefinitely and are isolated to the active tab.
   const [user, setUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('iinicia_user');
+    const saved = sessionStorage.getItem('iinicia_user') || localStorage.getItem('iinicia_user');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        localStorage.removeItem('iinicia_user'); // Clean up old insecure storage
+        return parsed;
       } catch (e) {
         return null;
       }
@@ -37,8 +40,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     if (user) {
-      localStorage.setItem('iinicia_user', JSON.stringify(user));
+      sessionStorage.setItem('iinicia_user', JSON.stringify(user));
     } else {
+      sessionStorage.removeItem('iinicia_user');
       localStorage.removeItem('iinicia_user');
     }
   }, [user]);
@@ -146,64 +150,62 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.warn('[Supabase AuthContext] Applications query error:', err);
     }
 
-    // 3. Fallback persona (when offline or demo)
-    const isExplicitDemo = cleanEmail in {
-      'valeria.morales@iinicia.edu.mx': 1,
-      'diego.solis@gmail.com': 1,
-      'alejandro.mendez@iinicia.edu.mx': 1,
-      'sofia.alarcon@iinicia.edu.mx': 1,
-      'admin.sistemas@iinicia.edu.mx': 1
-    };
+    // VULN-008 FIX: Demo fallback only works in development mode.
+    // In production, only Supabase-authenticated users can log in.
+    if (import.meta.env.DEV) {
+      const DEMO_EMAILS: Record<string, string> = {
+        'valeria.morales@iinicia.edu.mx': 'estudiante',
+        'diego.solis@gmail.com': 'aspirante',
+        'alejandro.mendez@iinicia.edu.mx': 'profesor',
+        'sofia.alarcon@iinicia.edu.mx': 'coordinador',
+        'admin.sistemas@iinicia.edu.mx': 'admin',
+      };
 
-    if (isExplicitDemo) {
-      const roleKey =
-        roleParam ||
-        (cleanEmail.includes('admin')
-          ? 'admin'
-          : cleanEmail.includes('coord')
-          ? 'coordinador'
-          : cleanEmail.includes('prof')
-          ? 'profesor'
-          : cleanEmail.includes('solis')
-          ? 'aspirante'
-          : 'estudiante');
-      const fallbackUser = DEMO_USERS[roleKey] || DEMO_USERS.estudiante;
-      setUser({ ...fallbackUser, email: cleanEmail });
+      if (cleanEmail in DEMO_EMAILS) {
+        const roleKey = (roleParam || DEMO_EMAILS[cleanEmail]) as Role;
+        const fallbackUser = DEMO_USERS[roleKey] || DEMO_USERS.estudiante;
+        setUser({ ...fallbackUser, email: cleanEmail });
+        return true;
+      }
+
+      // Allow any email in DEV with the provided role (or aspirante)
+      const resolvedName =
+        customName ||
+        cleanEmail
+          .split('@')[0]
+          .split(/[._-]/)
+          .filter(Boolean)
+          .map((p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase())
+          .join(' ');
+
+      const devUser: User = {
+        id: `USR-DEV-${Date.now().toString().slice(-6)}`,
+        name: resolvedName,
+        email: cleanEmail,
+        role: roleParam || 'aspirante',
+        programName: 'Licenciatura en Inteligencia Artificial y Ciencia de Datos',
+        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80'
+      };
+      setUser(devUser);
       return true;
     }
 
-    // New user with their real name
-    const resolvedName =
-      customName ||
-      (cleanEmail
-        ? cleanEmail
-            .split('@')[0]
-            .split(/[._-]/)
-            .filter(Boolean)
-            .map((p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase())
-            .join(' ')
-        : 'Usuario');
-
-    const dynamicRole: Role = roleParam || 'aspirante';
-    const newUser: User = {
-      id: `USR-${Date.now().toString().slice(-6)}`,
-      name: resolvedName,
-      email: cleanEmail,
-      role: dynamicRole,
-      programName: 'Licenciatura en Inteligencia Artificial y Ciencia de Datos',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80'
-    };
-    setUser(newUser);
-    return true;
+    // PRODUCTION: If Supabase didn't find the user, deny login.
+    console.warn('[IINICIA Auth] User not found in Supabase. Login denied in production.');
+    return false;
   };
 
   const logout = () => {
     setUser(null);
+    sessionStorage.removeItem('iinicia_user');
     localStorage.removeItem('iinicia_user');
+    supabase.auth.signOut().catch(() => {});
   };
 
+  // VULN-004 FIX: switchRole only works in development mode.
+  // In production, role switching is disabled to prevent privilege escalation.
   const switchRole = (newRole: Role) => {
-    if (DEMO_USERS[newRole]) {
+    if (import.meta.env.DEV && DEMO_USERS[newRole]) {
       setUser(DEMO_USERS[newRole]);
     }
   };
