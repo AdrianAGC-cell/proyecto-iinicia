@@ -49,12 +49,11 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
                 // 2. Cargar Cursos
                 val cursosResultado = repository.getCourses()
-                if (cursosResultado.isSuccess && cursosResultado.getOrNull()?.isNotEmpty() == true) {
-                    _courses.value = cursosResultado.getOrNull()!!
+                if (cursosResultado.isSuccess) {
+                    _courses.value = cursosResultado.getOrNull().orEmpty()
                     _isOfflineMode.value = false
                 } else {
-                    // Si Moodle está en otra laptop o sin conexión, mantener cursos académicos de continuidad
-                    _courses.value = repository.demoCourses
+                    _courses.value = emptyList()
                     _isOfflineMode.value = true
                 }
 
@@ -66,9 +65,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 }
 
             } catch (_: Exception) {
-                if (_courses.value.isEmpty()) {
-                    _courses.value = repository.demoCourses
-                }
+                _courses.value = emptyList()
                 if (_user.value.name.isBlank()) {
                     _user.value = repository.demoUser
                 }
