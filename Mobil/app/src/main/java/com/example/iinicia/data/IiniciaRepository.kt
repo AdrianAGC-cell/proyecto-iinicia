@@ -183,58 +183,9 @@ class IiniciaRepository(context: Context) {
             // Moodle offline o sin servidor local disponible en este momento
         }
 
-        // 2. Intentar autenticación con Supabase Auth
-        try {
-            val sbResponse = supabaseApi.supabaseSignIn(
-                apiKey = SupabaseClient.SUPABASE_KEY,
-                request = SupabaseLoginRequest(email = identificador, password = pass)
-            )
-            if (sbResponse.isSuccessful && sbResponse.body()?.access_token != null) {
-                val token = sbResponse.body()!!.access_token!!
-                tokenManager.saveToken(token)
-
-                val roleName = when {
-                    identificador.contains("admin") -> "Administrador TI"
-                    identificador.contains("coord") -> "Coordinador Académico"
-                    identificador.contains("prof") -> "Profesor Titular"
-                    identificador.contains("asp") -> "Aspirante"
-                    else -> "Estudiante"
-                }
-
-                val user = UserDto(
-                    id = "sb-" + Math.abs(identificador.hashCode()),
-                    name = identificador.substringBefore("@").replace(".", " ").split(" ").joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } },
-                    email = identificador,
-                    role = roleName,
-                    moodleId = "IIN-2026-" + Math.abs(identificador.hashCode() % 10000)
-                )
-                currentUser = user
-                return Result.success(LoginResponse(token = token, user = user))
-            }
-        } catch (_: Exception) {
-            // Supabase network error
-        }
-
-        // 3. Fallback institucional de continuidad (soporta todas las credenciales oficiales)
-        val cleanEmail = identificador.lowercase()
-        val (roleName, name, matricula) = when {
-            cleanEmail.contains("admin") -> Triple("Administrador TI", "Ing. Roberto Peña Guzmán", "ADM-2026-001")
-            cleanEmail.contains("coord") -> Triple("Coordinador Académico", "Dra. Sofía Alarcón Ruiz", "CRD-2026-002")
-            cleanEmail.contains("prof") -> Triple("Profesor Titular", "Dr. Alejandro Méndez Vargas", "DOC-2026-104")
-            cleanEmail.contains("valeria") || cleanEmail.contains("estudiante") -> Triple("Estudiante", "Valeria Morales Santillán", "IIN-2024-8842")
-            cleanEmail.contains("asp") || cleanEmail.contains("solis") -> Triple("Aspirante", "Diego Armando Solís", "SOL-2026-9041")
-            else -> Triple("Estudiante", cleanEmail.substringBefore("@").replace(".", " ").split(" ").joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }, "IIN-2026-" + Math.abs(cleanEmail.hashCode() % 10000))
-        }
-
-        val fallbackUser = UserDto(
-            id = "usr-" + Math.abs(cleanEmail.hashCode() % 100000),
-            name = name,
-            email = cleanEmail,
-            role = roleName,
-            moodleId = matricula
+        return Result.failure(
+            Exception("No se pudo autenticar en Moodle. Verifica tus credenciales y la conexion.")
         )
-        currentUser = fallbackUser
-        return Result.success(LoginResponse(token = "session-iinicia-active", user = fallbackUser))
     }
 
     suspend fun getProfile(): Result<UserDto> {

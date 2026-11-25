@@ -1,3 +1,5 @@
+import { configurarProfesorMoodle } from './moodleTeacher.js';
+import { configurarTareasMoodle } from './moodleAssignments.js';
 import { configurarArchivosMoodle } from './moodleFiles.js';
 import { configurarCursosMoodle } from './moodleCourses.js';
 import express from 'express';
@@ -13,8 +15,8 @@ const PORT = process.env.PORT || 5000;
 const MOODLE_URL = process.env.MOODLE_URL;
 const MOODLE_TOKEN = process.env.MOODLE_TOKEN;
 
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://hwzkpkmithroyobntypq.supabase.co';
-const SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh3emtwa21pdGhyb3lvYm50eXBxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI2MzU2NTYsImV4cCI6MjEwODIxMTY1Nn0.ncSUUAO-jojOdTu6NzuJxf7lxFCSyg3O_02yU9n1Jt0';
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://rcsamjsjaeyirreinfln.supabase.co';
+const SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJjc2FtanNqYWV5aXJyZWluZmxuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ0NDg1MDIsImV4cCI6MjExMDAyNDUwMn0.XujGoPht4DjP7eBx2uOXewW0Rx6RkZnJOeOI4Jy-SL8';
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 app.use(cors({
@@ -27,6 +29,8 @@ app.use(express.json());
 configurarAutenticacion(app);
 configurarArchivosMoodle(app);
 configurarCursosMoodle(app);
+configurarTareasMoodle(app);
+configurarProfesorMoodle(app);
 // Consultar secciones y actividades reales de Moodle
 app.get('/api/moodle/courses/:id/contents', async (req, res) => {
   try {

@@ -14,8 +14,11 @@ import {
 import { MOCK_APPLICATIONS } from '../data/mockData';
 import { AdmissionApplication } from '../types';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../context/AuthContext';
+import { Link } from 'react-router-dom';
 
 export const AdminPanel: React.FC = () => {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'aspirantes' | 'moodle' | 'cms'>('aspirantes');
   const [searchTerm, setSearchTerm] = useState('');
   const [syncingId, setSyncingId] = useState<string | null>(null);
@@ -72,6 +75,13 @@ export const AdminPanel: React.FC = () => {
   }, []);
 
   const handleApproveAndSync = async (appId: string) => {
+    // VULN-005 FIX: Verify authorized role before executing administrative update
+    const isAuthorized = user && (user.role === 'admin' || user.role === 'coordinador');
+    if (!isAuthorized) {
+      alert('Operación denegada: Se requiere rol de Coordinador o Administrador TI.');
+      return;
+    }
+
     setSyncingId(appId);
     const target = apps.find(a => a.id === appId);
     const generatedMoodleId = target?.moodleUserId || Math.floor(1000 + Math.random() * 4000);
@@ -120,6 +130,40 @@ export const AdminPanel: React.FC = () => {
       a.programName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       a.id.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // VULN-005 FIX: Access control guard (RBAC)
+  const isAuthorized = user && (user.role === 'admin' || user.role === 'coordinador');
+  if (!isAuthorized) {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center px-4 py-16">
+        <div className="max-w-md w-full bg-white rounded-3xl p-8 border border-red-200 shadow-xl text-center space-y-4">
+          <div className="w-14 h-14 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto">
+            <ShieldCheck className="w-8 h-8 text-red-600" />
+          </div>
+          <h2 className="text-xl font-black text-slate-900 tracking-tight">
+            Acceso Restringido (RBAC)
+          </h2>
+          <p className="text-xs text-slate-600 leading-relaxed">
+            Esta sección está reservada exclusivamente para <strong>Coordinadores Académicos</strong> y <strong>Administradores TI</strong> de I²NICIA. Tu sesión actual no cuenta con los privilegios requeridos.
+          </p>
+          <div className="pt-2 flex flex-col gap-2">
+            <Link
+              to="/login"
+              className="py-2.5 px-4 bg-[#22abe2] hover:bg-[#1b9ad0] text-white text-xs font-bold rounded-xl transition shadow-md shadow-[#22abe2]/20"
+            >
+              Iniciar sesión con cuenta autorizada
+            </Link>
+            <Link
+              to="/"
+              className="py-2 px-4 text-xs font-semibold text-slate-600 hover:text-slate-900"
+            >
+              Volver al inicio
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 pb-24 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">

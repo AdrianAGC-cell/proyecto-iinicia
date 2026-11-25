@@ -38,35 +38,15 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun loginWithGoogle() {
-        viewModelScope.launch {
-            _authState.value = AuthState.Loading
-            val googleUser = UserDto(
-                id = "usr-google-est",
-                name = "Estudiante Google IINICIA",
-                email = "estudiante.google@iinicia.edu.mx",
-                role = "Estudiante",
-                moodleId = "IIN-2026-GGL"
-            )
-            IiniciaRepository.currentUser = googleUser
-            _authState.value = AuthState.Success(googleUser)
-        }
+        _authState.value = AuthState.Error(
+            "El acceso con Google requiere autenticacion real."
+        )
     }
 
     fun register(name: String, email: String, pass: String) {
-        viewModelScope.launch {
-            _authState.value = AuthState.Loading
-            val cleanName = name.ifBlank { "Aspirante IINICIA" }
-            val cleanEmail = email.ifBlank { "aspirante@iinicia.edu.mx" }
-            val newUser = UserDto(
-                id = "usr-asp-" + (System.currentTimeMillis() % 10000),
-                name = cleanName,
-                email = cleanEmail,
-                role = "Aspirante",
-                moodleId = "SOL-2026-" + (1000 + (System.currentTimeMillis() % 9000))
-            )
-            IiniciaRepository.currentUser = newUser
-            _authState.value = AuthState.Success(newUser)
-        }
+        _authState.value = AuthState.Error(
+            "Por el momento realiza tu registro desde el portal web."
+        )
     }
 
     fun logout() {

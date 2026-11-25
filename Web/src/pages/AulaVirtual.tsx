@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { ArrowLeft, BookOpen, FileText, Loader2 } from 'lucide-react';
 
+import { ActividadMoodle } from '../components/moodle/ActividadMoodle';
+import type { Tarea } from '../components/moodle/TareaMoodle';
+
 type Actividad = {
   id: number;
   nombre: string;
@@ -30,6 +33,8 @@ export const AulaVirtual: React.FC<Props> = ({
   onBack
 }) => {
   const [secciones, setSecciones] = useState<Seccion[]>([]);
+  const [tareas, setTareas] = useState<Tarea[]>([]);
+  const [errorTareas, setErrorTareas] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -40,6 +45,8 @@ export const AulaVirtual: React.FC<Props> = ({
       setLoading(true);
       setError('');
       setSecciones([]);
+      setTareas([]);
+      setErrorTareas('');
 
       try {
         const response = await fetch(
@@ -67,6 +74,33 @@ export const AulaVirtual: React.FC<Props> = ({
         }
 
         setSecciones(data.secciones);
+
+        try {
+          const respuestaTareas = await fetch(
+            `/api/auth/courses/${courseId}/assignments`,
+            {
+              credentials: 'include',
+              signal: controller.signal
+            }
+          );
+
+          if (!respuestaTareas.ok) {
+            throw new Error('No se pudieron consultar las tareas.');
+          }
+
+          const datosTareas = await respuestaTareas.json();
+
+          if (!datosTareas.success || !Array.isArray(datosTareas.tareas)) {
+            throw new Error('Respuesta de tareas inválida.');
+          }
+
+          setTareas(datosTareas.tareas);
+
+        } catch (err) {
+          if (!controller.signal.aborted) {
+            setErrorTareas('No se pudieron cargar las entregas de Moodle.');
+          }
+        }
       } catch (err) {
         if (!controller.signal.aborted) {
           setError(
@@ -121,6 +155,12 @@ export const AulaVirtual: React.FC<Props> = ({
         <p>Este curso todavía no tiene contenidos visibles.</p>
       )}
 
+      {errorTareas && (
+        <div role="alert" className="bg-amber-50 text-amber-700 rounded-xl p-4 text-sm">
+          {errorTareas}
+        </div>
+      )}
+
       {!loading && !error && secciones.map(seccion => (
         <section
           key={seccion.id}
@@ -137,6 +177,10 @@ export const AulaVirtual: React.FC<Props> = ({
           )}
 
           {seccion.actividades.map(actividad => {
+            const tarea = tareas.find(
+              t => t.moduloId === actividad.id
+            );
+
             const tienePdf =
               actividad.tipo === 'resource' &&
               actividad.contents?.some(
@@ -147,7 +191,7 @@ export const AulaVirtual: React.FC<Props> = ({
             return (
               <div
                 key={actividad.id}
-                className="border border-slate-100 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                className="border border-slate-100 rounded-xl p-4 flex flex-col gap-3"
               >
                 <div className="flex items-center gap-3">
                   <FileText className="w-5 h-5 text-[#22abe2]" />
@@ -160,6 +204,14 @@ export const AulaVirtual: React.FC<Props> = ({
                     </p>
                   </div>
                 </div>
+
+                {actividad.tipo === 'assign' && tarea && (
+                  <ActividadMoodle
+                    key={`${courseId}-${tarea.id}`}
+                    courseId={courseId}
+                    tarea={tarea}
+                  />
+                )}
 
                 {tienePdf && (
                   <a
