@@ -1,9 +1,10 @@
+import { GestionCohortes } from '../components/admin/GestionCohortes';
+import { GestionCursos } from '../components/admin/GestionCursos';
 import React, { useEffect, useState } from 'react';
 import {
   ShieldCheck,
   Server,
   Database,
-  BookOpen,
   RefreshCw,
   Loader2,
   AlertCircle,
@@ -22,14 +23,6 @@ interface Resumen {
     version: string | null;
     latencia: number;
   };
-}
-
-interface Curso {
-  id: number;
-  nombre: string;
-  nombreCorto: string;
-  categoria: number;
-  visible: boolean;
 }
 
 async function consultar(ruta: string) {
@@ -52,11 +45,8 @@ export const AdminPanel: React.FC = () => {
   const { user } = useAuth();
 
   const [resumen, setResumen] = useState<Resumen | null>(null);
-  const [cursos, setCursos] = useState<Curso[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
-  const [errorCursos, setErrorCursos] = useState('');
-  const [busqueda, setBusqueda] = useState('');
   const [actualizacion, setActualizacion] = useState(0);
 
   const rol = user?.role;
@@ -79,9 +69,7 @@ export const AdminPanel: React.FC = () => {
     let activo = true;
 
     setResumen(null);
-    setCursos([]);
     setError('');
-    setErrorCursos('');
     setCargando(true);
 
     const cargar = async () => {
@@ -93,17 +81,6 @@ export const AdminPanel: React.FC = () => {
 
         setResumen(datos);
 
-        if (puedeVerCursos) {
-          try {
-            const resultado = await consultar('/api/auth/admin/cursos');
-
-            if (activo) {
-              setCursos(resultado.cursos);
-            }
-          } catch (e: any) {
-            if (activo) setErrorCursos(e.message);
-          }
-        }
 
       } catch (e: any) {
         if (activo) setError(e.message);
@@ -119,12 +96,6 @@ export const AdminPanel: React.FC = () => {
     };
 
   }, [user?.id, rol, puedeVerCursos, actualizacion]);
-
-  const filtrados = cursos.filter(curso =>
-    `${curso.nombre} ${curso.nombreCorto}`
-      .toLowerCase()
-      .includes(busqueda.toLowerCase())
-  );
 
   if (!user) return null;
 
@@ -223,80 +194,14 @@ export const AdminPanel: React.FC = () => {
       )}
 
       {puedeVerCursos && resumen && (
-        <section className="bg-white border rounded-3xl p-6 shadow-sm space-y-5">
-
-          <div className="flex items-center gap-3">
-            <BookOpen className="text-sky-600" />
-
-            <h2 className="text-xl font-bold">
-              Cursos institucionales
-            </h2>
-          </div>
-
-          {rol === 'coordinador' && (
-            <p className="text-sm text-slate-500">
-              Categorías asignadas: {
-                user.ambitos
-                  ?.filter(a => a.rol === 'coordinador')
-                  .map(a => a.instancia)
-                  .join(', ') || 'Sin categorías'
-              }
-            </p>
-          )}
-
-          {errorCursos ? (
-            <p className="text-red-600">{errorCursos}</p>
-          ) : (
-            <>
-              <p className="text-slate-500">
-                Cursos encontrados: {cursos.length}
-              </p>
-
-              <input
-                value={busqueda}
-                onChange={e => setBusqueda(e.target.value)}
-                placeholder="Buscar curso..."
-                className="w-full border rounded-xl p-3"
-              />
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-slate-50">
-                    <tr>
-                      <th className="p-3">ID</th>
-                      <th className="p-3">Curso</th>
-                      <th className="p-3">Clave</th>
-                      <th className="p-3">Categoría</th>
-                      <th className="p-3">Estado</th>
-                    </tr>
-                  </thead>
-
-                  <tbody>
-                    {filtrados.map(curso => (
-                      <tr key={curso.id} className="border-b">
-                        <td className="p-3">{curso.id}</td>
-                        <td className="p-3 font-semibold">{curso.nombre}</td>
-                        <td className="p-3">{curso.nombreCorto}</td>
-                        <td className="p-3">{curso.categoria}</td>
-                        <td className="p-3">
-                          {curso.visible ? 'Visible' : 'Oculto'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {!cargando && filtrados.length === 0 && (
-                <p className="text-slate-500 py-5">
-                  No hay cursos disponibles para esta consulta.
-                </p>
-              )}
-            </>
-          )}
-
-        </section>
+        <GestionCursos />
       )}
+
+      {resumen &&
+        (rol === 'superadmin' || rol === 'admin_academico') && (
+          <GestionCohortes />
+      )}
+
 
       {(rol === 'superadmin' || rol === 'admin_academico') && (
         <section className="bg-white border rounded-2xl p-6">

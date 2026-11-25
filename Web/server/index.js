@@ -1,3 +1,4 @@
+import { configurarGestionCursos } from './moodleGestionCursos.js';
 import { configurarAdministracionMoodle } from './moodleAdmin.js';
 import { exigirRoles } from './moodleRoles.js';
 import { configurarProfesorMoodle } from './moodleTeacher.js';
@@ -457,6 +458,8 @@ app.post('/api/auth/sso-ticket', (req, res) => {
 });
 
 configurarAdministracionMoodle(app);
+
+configurarGestionCursos(app);
 
 app.listen(PORT, () => {
   console.log(`[IINICIA Backend] API listening on port ${PORT}`);
