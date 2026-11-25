@@ -1,3 +1,4 @@
+import { consultarRoles } from './moodleRoles.js';
 import express from 'express';
 import session from 'express-session';
 import { rateLimit } from 'express-rate-limit';
@@ -110,7 +111,7 @@ export function configurarAutenticacion(app) {
     });
 
     // Consultar el usuario autenticado.
-    router.get('/me', (req, res) => {
+    router.get('/me', async (req, res) => {
 
         res.set('Cache-Control', 'no-store');
 
@@ -121,10 +122,31 @@ export function configurarAutenticacion(app) {
             });
         }
 
-        return res.json({
-            success: true,
-            usuario: req.session.usuario
-        });
+        try {
+            const identidad = await consultarRoles(
+                req.session.moodleToken,
+                req.session.usuario.id
+            );
+
+            if (!identidad.rol) {
+                return res.status(403).json({
+                    success: false,
+                    error: 'Usuario sin rol institucional'
+                });
+            }
+
+            Object.assign(req.session.usuario, identidad);
+
+            return res.json({
+                success: true,
+                usuario: req.session.usuario
+            });
+        } catch (_) {
+            return res.status(503).json({
+                success: false,
+                error: 'No se pudo verificar la identidad'
+            });
+        }
     });
 
     // Cerrar sesion.

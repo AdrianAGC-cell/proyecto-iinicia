@@ -1,3 +1,5 @@
+import { configurarAdministracionMoodle } from './moodleAdmin.js';
+import { exigirRoles } from './moodleRoles.js';
 import { configurarProfesorMoodle } from './moodleTeacher.js';
 import { configurarTareasMoodle } from './moodleAssignments.js';
 import { configurarArchivosMoodle } from './moodleFiles.js';
@@ -404,12 +406,21 @@ app.post('/api/admissions/apply', (req, res) => {
 });
 
 // Admin Applications list
-app.get('/api/admin/applications', (req, res) => {
+app.get('/api/admin/applications',
+  exigirRoles('superadmin', 'admin_academico'),
+  (req, res) => {
   res.json(applications);
 });
 
 // Admin Approve Application and Sync with Moodle (Idempotent)
-app.post('/api/admin/applications/:id/approve', (req, res) => {
+app.post('/api/admin/applications/:id/approve',
+  exigirRoles('superadmin', 'admin_academico'),
+  (req, res) => {
+  return res.status(501).json({
+    success: false,
+    error: 'Aprobacion real pendiente de integracion con Moodle'
+  });
+
   const appItem = applications.find(a => a.id === req.params.id);
   if (!appItem) return res.status(404).json({ error: 'Solicitud no encontrada' });
 
@@ -430,6 +441,11 @@ app.post('/api/admin/applications/:id/approve', (req, res) => {
 
 // Mock SSO Auth Check
 app.post('/api/auth/sso-ticket', (req, res) => {
+  return res.status(501).json({
+    success: false,
+    error: 'SSO real pendiente de configuracion'
+  });
+
   const { userEmail } = req.body;
   // Simulates issuing a short-lived one-time ticket for Moodle SSO seamless redirect
   const ssoTicket = `iinicia-sso-${Math.random().toString(36).substring(2, 15)}-${Date.now()}`;
@@ -439,6 +455,8 @@ app.post('/api/auth/sso-ticket', (req, res) => {
     expiresInSeconds: 60
   });
 });
+
+configurarAdministracionMoodle(app);
 
 app.listen(PORT, () => {
   console.log(`[IINICIA Backend] API listening on port ${PORT}`);

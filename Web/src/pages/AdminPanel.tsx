@@ -1,458 +1,324 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Users, 
-  ShieldCheck, 
-  Server, 
-  CheckCircle2, 
-  Clock, 
-  Search, 
-  RefreshCw, 
-  PlusCircle,
+import React, { useEffect, useState } from 'react';
+import {
+  ShieldCheck,
+  Server,
   Database,
-  Loader2
+  BookOpen,
+  RefreshCw,
+  Loader2,
+  AlertCircle,
+  CheckCircle2,
+  Users,
+  Headphones
 } from 'lucide-react';
-import { MOCK_APPLICATIONS } from '../data/mockData';
-import { AdmissionApplication } from '../types';
-import { supabase } from '../lib/supabase';
+
 import { useAuth } from '../context/AuthContext';
-import { Link } from 'react-router-dom';
+import { nombresRoles } from '../security/roles';
 
-export const AdminPanel: React.FC = () => {
-  const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'aspirantes' | 'moodle' | 'cms'>('aspirantes');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [syncingId, setSyncingId] = useState<string | null>(null);
-  const [loadingDb, setLoadingDb] = useState(false);
+interface Resumen {
+  moodle: {
+    conectado: boolean;
+    sitio: string;
+    version: string | null;
+    latencia: number;
+  };
+}
 
-  const [apps, setApps] = useState<AdmissionApplication[]>(() => {
-    const saved = localStorage.getItem('iinicia_apps');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (parsed.length > 0) return parsed;
-      } catch (e) {}
-    }
-    return MOCK_APPLICATIONS;
+interface Curso {
+  id: number;
+  nombre: string;
+  nombreCorto: string;
+  categoria: number;
+  visible: boolean;
+}
+
+async function consultar(ruta: string) {
+  const respuesta = await fetch(ruta, {
+    credentials: 'include',
+    cache: 'no-store'
   });
 
-  const [idempotencyLog, setIdempotencyLog] = useState<string[]>([]);
+  const datos = await respuesta.json();
 
-  const fetchAppsFromSupabase = async () => {
-    setLoadingDb(true);
-    try {
-      const { data, error } = await supabase
-        .from('admission_applications')
-        .select('*')
-        .order('created_at', { ascending: false });
+  if (!respuesta.ok || !datos.success) {
+    throw new Error(datos.error || 'Error de consulta');
+  }
 
-      if (data && data.length > 0 && !error) {
-        const mapped: AdmissionApplication[] = data.map((d: any) => ({
-          id: d.id,
-          fullName: d.full_name,
-          email: d.email,
-          phone: d.phone || 'No especificado',
-          programId: d.program_id,
-          programName: d.program_name,
-          previousSchool: d.previous_school || 'Bachillerato',
-          averageGrade: String(d.average_grade || '9.0'),
-          status: d.status || 'EN REVISION',
-          moodleSynced: d.moodle_synced || false,
-          moodleUserId: d.moodle_user_id || null,
-          date: d.created_at ? d.created_at.split('T')[0] : '2026-10-26'
-        }));
-        setApps(mapped);
-        localStorage.setItem('iinicia_apps', JSON.stringify(mapped));
-      }
-    } catch (err) {
-      console.warn('Could not load apps from Supabase:', err);
-    } finally {
-      setLoadingDb(false);
-    }
+  return datos;
+}
+
+export const AdminPanel: React.FC = () => {
+
+  const { user } = useAuth();
+
+  const [resumen, setResumen] = useState<Resumen | null>(null);
+  const [cursos, setCursos] = useState<Curso[]>([]);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState('');
+  const [errorCursos, setErrorCursos] = useState('');
+  const [busqueda, setBusqueda] = useState('');
+  const [actualizacion, setActualizacion] = useState(0);
+
+  const rol = user?.role;
+
+  const puedeVerCursos =
+    rol === 'superadmin' ||
+    rol === 'admin_academico' ||
+    rol === 'coordinador';
+
+  const descripciones: Record<string, string> = {
+    superadmin: 'Administración general de la plataforma institucional.',
+    admin_tecnico: 'Supervisión técnica y estado de las integraciones.',
+    admin_academico: 'Administración de la oferta académica institucional.',
+    coordinador: 'Supervisión de los cursos de tu categoría asignada.',
+    soporte: 'Diagnóstico básico de los servicios institucionales.'
   };
 
   useEffect(() => {
-    fetchAppsFromSupabase();
-  }, []);
 
-  const handleApproveAndSync = async (appId: string) => {
-    // VULN-005 FIX: Verify authorized role before executing administrative update
-    const isAuthorized = user && (user.role === 'admin' || user.role === 'coordinador');
-    if (!isAuthorized) {
-      alert('Operación denegada: Se requiere rol de Coordinador o Administrador TI.');
-      return;
-    }
+    let activo = true;
 
-    setSyncingId(appId);
-    const target = apps.find(a => a.id === appId);
-    const generatedMoodleId = target?.moodleUserId || Math.floor(1000 + Math.random() * 4000);
+    setResumen(null);
+    setCursos([]);
+    setError('');
+    setErrorCursos('');
+    setCargando(true);
 
-    try {
-      await supabase
-        .from('admission_applications')
-        .update({
-          status: 'ADMITIDO',
-          moodle_synced: true,
-          moodle_user_id: generatedMoodleId,
-          moodle_sync_date: new Date().toISOString()
-        })
-        .eq('id', appId);
-    } catch (err) {
-      console.warn('Error updating Supabase:', err);
-    }
+    const cargar = async () => {
+      try {
 
-    const updated = apps.map((a) => {
-      if (a.id === appId) {
-        return {
-          ...a,
-          status: 'ADMITIDO' as const,
-          moodleSynced: true,
-          moodleUserId: generatedMoodleId
-        };
+        const datos = await consultar('/api/auth/admin/resumen');
+
+        if (!activo) return;
+
+        setResumen(datos);
+
+        if (puedeVerCursos) {
+          try {
+            const resultado = await consultar('/api/auth/admin/cursos');
+
+            if (activo) {
+              setCursos(resultado.cursos);
+            }
+          } catch (e: any) {
+            if (activo) setErrorCursos(e.message);
+          }
+        }
+
+      } catch (e: any) {
+        if (activo) setError(e.message);
+      } finally {
+        if (activo) setCargando(false);
       }
-      return a;
-    });
-    setApps(updated);
-    localStorage.setItem('iinicia_apps', JSON.stringify(updated));
-    setSyncingId(null);
-  };
+    };
 
-  const handleTestIdempotency = () => {
-    const target = apps[0];
-    const log1 = `[${new Date().toLocaleTimeString()}] LLAMADA 1: POST /api/moodle/sync -> Aspirante '${target.fullName}' verificado. ID existente #${target.moodleUserId || 1042}. No se genera duplicado.`;
-    const log2 = `[${new Date().toLocaleTimeString()}] LLAMADA 2: POST /api/moodle/sync -> Idempotencia confirmada en Supabase: Estado 'ACTIVE', Cohorte '2026-A' vinculada.`;
-    setIdempotencyLog([log2, log1, ...idempotencyLog]);
-  };
+    void cargar();
 
-  const filteredApps = apps.filter(
-    (a) =>
-      a.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      a.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      a.programName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      a.id.toLowerCase().includes(searchTerm.toLowerCase())
+    return () => {
+      activo = false;
+    };
+
+  }, [user?.id, rol, puedeVerCursos, actualizacion]);
+
+  const filtrados = cursos.filter(curso =>
+    `${curso.nombre} ${curso.nombreCorto}`
+      .toLowerCase()
+      .includes(busqueda.toLowerCase())
   );
 
-  // VULN-005 FIX: Access control guard (RBAC)
-  const isAuthorized = user && (user.role === 'admin' || user.role === 'coordinador');
-  if (!isAuthorized) {
-    return (
-      <div className="min-h-[70vh] flex items-center justify-center px-4 py-16">
-        <div className="max-w-md w-full bg-white rounded-3xl p-8 border border-red-200 shadow-xl text-center space-y-4">
-          <div className="w-14 h-14 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto">
-            <ShieldCheck className="w-8 h-8 text-red-600" />
-          </div>
-          <h2 className="text-xl font-black text-slate-900 tracking-tight">
-            Acceso Restringido (RBAC)
-          </h2>
-          <p className="text-xs text-slate-600 leading-relaxed">
-            Esta sección está reservada exclusivamente para <strong>Coordinadores Académicos</strong> y <strong>Administradores TI</strong> de I²NICIA. Tu sesión actual no cuenta con los privilegios requeridos.
-          </p>
-          <div className="pt-2 flex flex-col gap-2">
-            <Link
-              to="/login"
-              className="py-2.5 px-4 bg-[#22abe2] hover:bg-[#1b9ad0] text-white text-xs font-bold rounded-xl transition shadow-md shadow-[#22abe2]/20"
-            >
-              Iniciar sesión con cuenta autorizada
-            </Link>
-            <Link
-              to="/"
-              className="py-2 px-4 text-xs font-semibold text-slate-600 hover:text-slate-900"
-            >
-              Volver al inicio
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  if (!user) return null;
 
   return (
-    <div className="space-y-8 pb-24 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
-      {/* Admin Header */}
-      <div className="bg-[#05080f] rounded-3xl p-6 sm:p-8 text-white shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6 border border-slate-800">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-[#22abe2]/20 text-[#7dd3f1] border border-[#22abe2]/30">
-              Coordinación & Administración I²NICIA
-            </span>
-            <span className="text-xs text-slate-400 font-mono">RBAC: Coordinador / Admin Académico</span>
+    <main className="max-w-7xl mx-auto px-6 py-10 space-y-8">
+
+      <section className="bg-slate-900 text-white rounded-3xl p-8">
+        <div className="flex items-center gap-4">
+          <ShieldCheck className="w-12 h-12 text-sky-400" />
+
+          <div>
+            <p className="text-sky-400 text-sm font-bold">
+              ADMINISTRACIÓN IINICIA
+            </p>
+
+            <h1 className="text-3xl font-black">
+              {nombresRoles[user.role]}
+            </h1>
+
+            <p className="text-slate-300 mt-2">
+              Bienvenido, {user.name}
+            </p>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
-            Panel de Control Institucional
-          </h1>
-          <p className="text-xs text-slate-300">
-            Aprobación de aspirantes, sincronización con Moodle LMS y monitoreo de servicios.
-          </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <button
-            onClick={fetchAppsFromSupabase}
-            disabled={loadingDb}
-            className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-sky-400 font-bold text-xs transition flex items-center gap-1.5 border border-slate-700 cursor-pointer disabled:opacity-50"
-          >
-            {loadingDb ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Database className="w-3.5 h-3.5" />}
-            <span>{loadingDb ? 'Cargando BD...' : 'Sincronizar con Supabase'}</span>
-          </button>
-          <button
-            onClick={handleTestIdempotency}
-            className="px-4 py-2.5 rounded-xl bg-[#22abe2] hover:bg-[#1b9ad0] text-white font-bold text-xs transition flex items-center gap-1.5 shadow-sm cursor-pointer"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>Test Idempotencia Moodle</span>
-          </button>
-        </div>
-      </div>
+        <p className="mt-5 text-slate-300">
+          {descripciones[user.role]}
+        </p>
+      </section>
 
-      {/* KPI Counters */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs hover:border-[#22abe2]/40 transition">
-          <p className="text-xs font-semibold text-slate-500 uppercase">Aspirantes Registrados</p>
-          <p className="text-2xl font-black text-slate-900 mt-1">{apps.length}</p>
-        </div>
-        <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs hover:border-[#22abe2]/40 transition">
-          <p className="text-xs font-semibold text-slate-500 uppercase">Alumnos Admitidos</p>
-          <p className="text-2xl font-black text-[#22abe2] mt-1">
-            {apps.filter(a => a.status === 'ADMITIDO').length}
-          </p>
-        </div>
-        <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs hover:border-[#22abe2]/40 transition">
-          <p className="text-xs font-semibold text-slate-500 uppercase">Cuentas Moodle Sincronizadas</p>
-          <p className="text-2xl font-black text-slate-900 mt-1">
-            {apps.filter(a => a.moodleSynced).length}
-          </p>
-        </div>
-        <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs hover:border-[#22abe2]/40 transition">
-          <p className="text-xs font-semibold text-slate-500 uppercase">Estado Moodle API / SSO</p>
-          <p className="text-2xl font-black text-[#22abe2] mt-1 flex items-center gap-1.5">
-            <CheckCircle2 className="w-5 h-5 text-[#22abe2]" />
-            <span>Operativo</span>
-          </p>
-        </div>
-      </div>
+      <div className="flex justify-between items-center">
+        <h2 className="text-xl font-bold">
+          Estado de los servicios
+        </h2>
 
-      {/* Admin Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-200 pb-1 text-xs font-bold">
         <button
-          onClick={() => setActiveTab('aspirantes')}
-          className={`px-4 py-2.5 rounded-xl transition ${
-            activeTab === 'aspirantes'
-              ? 'bg-[#22abe2] text-white shadow-xs'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
+          onClick={() => setActualizacion(v => v + 1)}
+          disabled={cargando}
+          className="flex items-center gap-2 bg-sky-600 text-white px-4 py-3 rounded-xl disabled:opacity-50"
         >
-          Admisiones & Matrícula Moodle ({apps.length})
-        </button>
-        <button
-          onClick={() => setActiveTab('moodle')}
-          className={`px-4 py-2.5 rounded-xl transition ${
-            activeTab === 'moodle'
-              ? 'bg-[#22abe2] text-white shadow-xs'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          Monitor de Integración & Auditoría
-        </button>
-        <button
-          onClick={() => setActiveTab('cms')}
-          className={`px-4 py-2.5 rounded-xl transition ${
-            activeTab === 'cms'
-              ? 'bg-[#22abe2] text-white shadow-xs'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          Gestor CMS I²NICIA
+          <RefreshCw className="w-4 h-4" />
+          Actualizar
         </button>
       </div>
 
-      {/* TAB 1: ASPIRANTES */}
-      {activeTab === 'aspirantes' && (
-        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden space-y-4 p-6">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <h3 className="text-base font-bold text-slate-900">
-              Expedientes de Aspirantes para Dictamen
-            </h3>
-            <div className="relative w-full sm:w-72">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+      {cargando && (
+        <div className="flex gap-3 items-center p-6">
+          <Loader2 className="animate-spin text-sky-600" />
+          Consultando Moodle...
+        </div>
+      )}
+
+      {error && (
+        <div className="bg-red-50 text-red-700 border border-red-200 rounded-xl p-5 flex gap-3">
+          <AlertCircle />
+          {error}
+        </div>
+      )}
+
+      {resumen && (
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-5">
+
+          <article className="bg-white border rounded-2xl p-6 shadow-sm">
+            <Server className="text-sky-600 mb-4" />
+            <p className="text-slate-500">Servidor Moodle</p>
+
+            <div className="flex items-center gap-2 mt-2 text-green-600 font-bold">
+              <CheckCircle2 className="w-5 h-5" />
+              Conectado
+            </div>
+
+            <p className="mt-2 text-sm">
+              {resumen.moodle.sitio}
+            </p>
+          </article>
+
+          <article className="bg-white border rounded-2xl p-6 shadow-sm">
+            <Database className="text-sky-600 mb-4" />
+            <p className="text-slate-500">Versión Moodle</p>
+
+            <p className="text-xl font-bold mt-2">
+              {resumen.moodle.version || 'No disponible'}
+            </p>
+          </article>
+
+          <article className="bg-white border rounded-2xl p-6 shadow-sm">
+            <RefreshCw className="text-sky-600 mb-4" />
+            <p className="text-slate-500">Tiempo de respuesta</p>
+
+            <p className="text-3xl font-black mt-2">
+              {resumen.moodle.latencia} ms
+            </p>
+          </article>
+
+        </section>
+      )}
+
+      {puedeVerCursos && resumen && (
+        <section className="bg-white border rounded-3xl p-6 shadow-sm space-y-5">
+
+          <div className="flex items-center gap-3">
+            <BookOpen className="text-sky-600" />
+
+            <h2 className="text-xl font-bold">
+              Cursos institucionales
+            </h2>
+          </div>
+
+          {rol === 'coordinador' && (
+            <p className="text-sm text-slate-500">
+              Categorías asignadas: {
+                user.ambitos
+                  ?.filter(a => a.rol === 'coordinador')
+                  .map(a => a.instancia)
+                  .join(', ') || 'Sin categorías'
+              }
+            </p>
+          )}
+
+          {errorCursos ? (
+            <p className="text-red-600">{errorCursos}</p>
+          ) : (
+            <>
+              <p className="text-slate-500">
+                Cursos encontrados: {cursos.length}
+              </p>
+
               <input
-                type="text"
-                placeholder="Buscar por nombre, correo, folio..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-[#22abe2]"
+                value={busqueda}
+                onChange={e => setBusqueda(e.target.value)}
+                placeholder="Buscar curso..."
+                className="w-full border rounded-xl p-3"
               />
-            </div>
-          </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider border-b border-slate-200">
-                <tr>
-                  <th className="py-3 px-4">Folio</th>
-                  <th className="py-3 px-4">Aspirante</th>
-                  <th className="py-3 px-4">Programa</th>
-                  <th className="py-3 px-4">Promedio</th>
-                  <th className="py-3 px-4">Dictamen</th>
-                  <th className="py-3 px-4">Moodle LMS</th>
-                  <th className="py-3 px-4 text-right">Acción</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredApps.map((a) => (
-                  <tr key={a.id} className="hover:bg-slate-50/70 transition">
-                    <td className="py-3.5 px-4 font-mono font-bold text-slate-800">{a.id}</td>
-                    <td className="py-3.5 px-4">
-                      <p className="font-bold text-slate-900">{a.fullName}</p>
-                      <p className="text-slate-400 text-[11px]">{a.email}</p>
-                    </td>
-                    <td className="py-3.5 px-4 text-slate-700 font-medium max-w-xs truncate">
-                      {a.programName}
-                    </td>
-                    <td className="py-3.5 px-4 font-black text-[#22abe2]">{a.averageGrade}</td>
-                    <td className="py-3.5 px-4">
-                      <span
-                        className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                          a.status === 'ADMITIDO'
-                            ? 'bg-[#22abe2]/15 text-[#148ebf]'
-                            : 'bg-amber-100 text-amber-800'
-                        }`}
-                      >
-                        {a.status}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      {a.moodleSynced ? (
-                        <span className="flex items-center gap-1.5 text-slate-900 font-semibold font-mono">
-                          <CheckCircle2 className="w-4 h-4 text-[#22abe2]" />
-                          <span>ID #{a.moodleUserId}</span>
-                        </span>
-                      ) : (
-                        <span className="text-slate-400 italic">No vinculado</span>
-                      )}
-                    </td>
-                    <td className="py-3.5 px-4 text-right">
-                      {a.status !== 'ADMITIDO' ? (
-                        <button
-                          onClick={() => handleApproveAndSync(a.id)}
-                          disabled={syncingId === a.id}
-                          className="px-3.5 py-1.5 rounded-xl bg-[#22abe2] hover:bg-[#1b9ad0] text-white font-bold text-xs transition shadow-xs cursor-pointer"
-                        >
-                          {syncingId === a.id ? 'Sincronizando...' : 'Admitir y Matricular'}
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handleApproveAndSync(a.id)}
-                          className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition"
-                        >
-                          Re-sincronizar
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th className="p-3">ID</th>
+                      <th className="p-3">Curso</th>
+                      <th className="p-3">Clave</th>
+                      <th className="p-3">Categoría</th>
+                      <th className="p-3">Estado</th>
+                    </tr>
+                  </thead>
 
-      {/* TAB 2: MOODLE MONITOR & AUDIT */}
-      {activeTab === 'moodle' && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
-              <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
-                <Server className="w-5 h-5 text-[#22abe2]" />
-                <span>Salud de Conexión de Servicios</span>
-              </h3>
-              <div className="space-y-3 text-xs">
-                <div className="flex justify-between items-center p-3 rounded-2xl bg-slate-50 border border-slate-100">
-                  <span className="font-semibold text-slate-700">Moodle REST Web Services (core_user / enrol)</span>
-                  <span className="px-2 py-0.5 rounded bg-[#22abe2]/15 text-[#148ebf] font-bold">ONLINE (24ms)</span>
-                </div>
-                <div className="flex justify-between items-center p-3 rounded-2xl bg-slate-50 border border-slate-100">
-                  <span className="font-semibold text-slate-700">Proveedor de Identidad OIDC / Keycloak</span>
-                  <span className="px-2 py-0.5 rounded bg-[#22abe2]/15 text-[#148ebf] font-bold">ONLINE (18ms)</span>
-                </div>
-                <div className="flex justify-between items-center p-3 rounded-2xl bg-slate-50 border border-slate-100">
-                  <span className="font-semibold text-slate-700">Base de Datos PostgreSQL (Pool 20 conex.)</span>
-                  <span className="px-2 py-0.5 rounded bg-[#22abe2]/15 text-[#148ebf] font-bold">ACTIVO</span>
-                </div>
-                <div className="flex justify-between items-center p-3 rounded-2xl bg-slate-50 border border-slate-100">
-                  <span className="font-semibold text-slate-700">Estado de WordPress Monolítico</span>
-                  <span className="px-2 py-0.5 rounded bg-slate-200 text-slate-600 font-bold">DEPRECADO / APAGADO</span>
-                </div>
+                  <tbody>
+                    {filtrados.map(curso => (
+                      <tr key={curso.id} className="border-b">
+                        <td className="p-3">{curso.id}</td>
+                        <td className="p-3 font-semibold">{curso.nombre}</td>
+                        <td className="p-3">{curso.nombreCorto}</td>
+                        <td className="p-3">{curso.categoria}</td>
+                        <td className="p-3">
+                          {curso.visible ? 'Visible' : 'Oculto'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            </div>
 
-            <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
-              <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-[#22abe2]" />
-                <span>Pruebas de Idempotencia y Auditoría</span>
-              </h3>
-              <p className="text-xs text-slate-600">
-                La regla arquitectónica exige que ejecutar múltiples veces la matriculación no cree cuentas duplicadas en Moodle.
-              </p>
-              <div className="bg-[#05080f] rounded-2xl p-4 text-[#7dd3f1] font-mono text-[11px] h-48 overflow-y-auto space-y-1 border border-slate-800">
-                {idempotencyLog.length === 0 ? (
-                  <p className="text-slate-500 italic">Haz clic en 'Test Idempotencia Moodle' para probar la verificación en vivo...</p>
-                ) : (
-                  idempotencyLog.map((log, i) => <p key={i}>{log}</p>)
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
+              {!cargando && filtrados.length === 0 && (
+                <p className="text-slate-500 py-5">
+                  No hay cursos disponibles para esta consulta.
+                </p>
+              )}
+            </>
+          )}
+
+        </section>
       )}
 
-      {/* TAB 3: CMS IINICIA HEADLESS */}
-      {activeTab === 'cms' && (
-        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-base font-bold text-slate-900">
-                Gestor de Contenidos Institucionales (CMS Desacoplado)
-              </h3>
-              <p className="text-xs text-slate-500">
-                Actualiza páginas, convocatorias y notas institucionales sin necesidad de WordPress.
-              </p>
-            </div>
-            <button
-              onClick={() => alert('Abriendo editor enriquecido de noticias y comunicados institucionales...')}
-              className="px-4 py-2 rounded-xl bg-[#22abe2] hover:bg-[#1b9ad0] text-white text-xs font-bold transition flex items-center gap-1.5"
-            >
-              <PlusCircle className="w-4 h-4" />
-              <span>Publicar Nuevo Contenido</span>
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-4 rounded-2xl border border-slate-200 space-y-2 hover:border-[#22abe2]/50 transition">
-              <span className="text-[10px] font-bold uppercase text-[#148ebf] bg-[#22abe2]/10 px-2 py-0.5 rounded">
-                Página Institucional
-              </span>
-              <h4 className="font-bold text-xs text-slate-900">Página de Inicio / Hero Banner</h4>
-              <p className="text-[11px] text-slate-500">Última edición hace 2 días por Ing. Roberto Peña.</p>
-              <button className="text-xs font-bold text-[#22abe2] hover:underline">Editar sección →</button>
-            </div>
-            <div className="p-4 rounded-2xl border border-slate-200 space-y-2 hover:border-[#22abe2]/50 transition">
-              <span className="text-[10px] font-bold uppercase text-[#148ebf] bg-[#22abe2]/10 px-2 py-0.5 rounded">
-                Catálogo
-              </span>
-              <h4 className="font-bold text-xs text-slate-900">Planes de Estudio RVOE</h4>
-              <p className="text-[11px] text-slate-500">5 programas activos en base de datos.</p>
-              <button className="text-xs font-bold text-[#22abe2] hover:underline">Gestionar materias →</button>
-            </div>
-            <div className="p-4 rounded-2xl border border-slate-200 space-y-2 hover:border-[#22abe2]/50 transition">
-              <span className="text-[10px] font-bold uppercase text-[#148ebf] bg-[#22abe2]/10 px-2 py-0.5 rounded">
-                Convocatorias
-              </span>
-              <h4 className="font-bold text-xs text-slate-900">Admisión 2026-2027</h4>
-              <p className="text-[11px] text-slate-500">Recepción de folios activa.</p>
-              <button className="text-xs font-bold text-[#22abe2] hover:underline">Configurar fechas →</button>
-            </div>
-          </div>
-        </div>
+      {(rol === 'superadmin' || rol === 'admin_academico') && (
+        <section className="bg-white border rounded-2xl p-6">
+          <Users className="text-sky-600 mb-3" />
+          <h2 className="font-bold">Gestión de admisiones</h2>
+          <p className="text-sm text-slate-500 mt-2">
+            Integración de solicitudes y matrículas pendiente.
+          </p>
+        </section>
       )}
-    </div>
+
+      {rol === 'soporte' && (
+        <section className="bg-white border rounded-2xl p-6">
+          <Headphones className="text-sky-600 mb-3" />
+          <h2 className="font-bold">Soporte técnico</h2>
+          <p className="text-sm text-slate-500 mt-2">
+            Diagnóstico de conexión disponible.
+            Gestión de incidencias pendiente.
+          </p>
+        </section>
+      )}
+
+    </main>
   );
 };

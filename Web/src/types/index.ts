@@ -1,10 +1,27 @@
-export type Role = 'aspirante' | 'estudiante' | 'profesor' | 'coordinador' | 'admin';
+export type Role =
+  | 'superadmin'
+  | 'admin_tecnico'
+  | 'admin_academico'
+  | 'coordinador'
+  | 'profesor'
+  | 'estudiante'
+  | 'aspirante'
+  | 'soporte'
+  | 'admin';
+
+export interface AmbitoRol {
+  rol: Role;
+  contexto: number;
+  instancia: number;
+}
 
 export interface User {
   id: string;
   name: string;
   email: string;
   role: Role;
+  roles?: Role[];
+  ambitos?: AmbitoRol[];
   matricula?: string;
   programId?: string;
   programName?: string;

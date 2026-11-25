@@ -1,3 +1,4 @@
+import { rutaPorRol } from '../security/roles';
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Lock, Mail, ArrowRight, Loader2, Database, AlertCircle } from 'lucide-react';
@@ -9,7 +10,7 @@ export const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const { login, loginWithGoogle, user } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
 
   const handleFormLogin = async (e: React.FormEvent) => {
@@ -25,14 +26,9 @@ export const Login: React.FC = () => {
       return;
     }
 
-    const cleanEmail = email.trim().toLowerCase();
-    if (cleanEmail.includes('admin') || cleanEmail.includes('coord') || user?.role === 'admin' || user?.role === 'coordinador') {
-      navigate('/admin');
-    } else if (cleanEmail.includes('asp') || user?.role === 'aspirante') {
-      navigate('/admisiones');
-    } else {
-      navigate('/mi-iinicia');
-    }
+    navigate(rutaPorRol(res.role || 'aspirante'), {
+      replace: true
+    });
   };
 
   const handleGoogleLogin = async () => {

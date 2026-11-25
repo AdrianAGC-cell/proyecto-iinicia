@@ -1,3 +1,4 @@
+import { nombresRoles, rolesAdministrativos } from '../../security/roles';
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
@@ -59,7 +60,7 @@ export const Navbar: React.FC = () => {
                 <span className="text-slate-400 hidden sm:inline">Sesión activa:</span>
                 <span className="font-bold text-white">{user.name}</span>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-[#22abe2]/20 text-[#22abe2] border border-[#22abe2]/40">
-                  {user.role}
+                  {nombresRoles[user.role]}
                 </span>
               </div>
             ) : (
@@ -132,7 +133,7 @@ export const Navbar: React.FC = () => {
             {isAuthenticated && user ? (
               <div className="flex items-center gap-2">
                 {/* Panel Admin / Coordinator Link if applicable */}
-                {(user.role === 'coordinador' || user.role === 'admin') && (
+                {rolesAdministrativos.includes(user.role) && (
                   <Link
                     to="/admin"
                     className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-bold text-slate-900 bg-slate-100 hover:bg-slate-200 border border-slate-300 hover:border-slate-400 transition-all duration-200 shadow-xs hover:-translate-y-0.5"
@@ -172,7 +173,7 @@ export const Navbar: React.FC = () => {
                         <p className="text-sm font-bold text-slate-900 truncate">{user.name}</p>
                         <p className="text-xs text-slate-500 truncate">{user.email}</p>
                         <span className="inline-block mt-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#22abe2]/15 text-[#11719b]">
-                          Rol: {user.role}
+                          Rol: {nombresRoles[user.role]}
                         </span>
                       </div>
                       <Link
@@ -276,9 +277,9 @@ export const Navbar: React.FC = () => {
                   className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#22abe2] to-[#148ebf] shadow-md"
                 >
                   <Sparkles className="w-4 h-4 text-white" />
-                  <span>Mi IINICIA ({user.role})</span>
+                  <span>Mi IINICIA ({nombresRoles[user.role]})</span>
                 </Link>
-                {(user.role === 'coordinador' || user.role === 'admin') && (
+                {rolesAdministrativos.includes(user.role) && (
                   <Link
                     to="/admin"
                     onClick={() => setMobileMenuOpen(false)}

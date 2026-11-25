@@ -1,3 +1,5 @@
+import { consultarRoles } from './moodleRoles.js';
+
 export async function autenticarMoodle(identificador, password, tipo) {
     const moodleUrl = process.env.MOODLE_URL;
     const moodleToken = process.env.MOODLE_TOKEN;
@@ -136,8 +138,18 @@ export async function autenticarMoodle(identificador, password, tipo) {
         // En caso de que falle la consulta de detalle, continuar con los datos del perfil
     }
 
+    const identidad = await consultarRoles(
+        datos.token,
+        perfil.userid
+    );
+
+    if (!identidad.rol) {
+        return null;
+    }
+
     return {
         usuario: {
+            ...identidad,
             id: perfil.userid,
             username: perfil.username,
             nombre: perfil.fullname,

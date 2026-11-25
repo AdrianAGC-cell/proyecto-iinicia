@@ -55,3 +55,11 @@ $functions['local_iinicia_review_cancel'] = [
     'capabilities' => 'mod/assign:grade',
     'services' => [MOODLE_OFFICIAL_MOBILE_SERVICE]
 ];
+
+$functions['local_iinicia_user_roles'] = [
+    'classname' => 'local_iinicia\external\user_roles',
+    'methodname' => 'execute',
+    'description' => 'Returns current authenticated user role assignments',
+    'type' => 'read',
+    'services' => [MOODLE_OFFICIAL_MOBILE_SERVICE]
+];

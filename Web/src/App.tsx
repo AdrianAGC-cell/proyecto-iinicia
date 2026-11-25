@@ -1,3 +1,5 @@
+import { ProtectedRoute } from './security/ProtectedRoute';
+import { rolesAdministrativos } from './security/roles';
 import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
@@ -47,8 +49,16 @@ export const App: React.FC = () => {
               <Route path="/contacto" element={<Contacto />} />
               <Route path="/login" element={<Login />} />
               <Route path="/registro" element={<Registro />} />
-              <Route path="/mi-iinicia" element={<MiIinicia />} />
-              <Route path="/admin" element={<AdminPanel />} />
+              <Route path="/mi-iinicia" element={
+      <ProtectedRoute roles={['profesor', 'estudiante']}>
+        <MiIinicia />
+      </ProtectedRoute>
+    } />
+              <Route path="/admin" element={
+      <ProtectedRoute roles={rolesAdministrativos}>
+        <AdminPanel />
+      </ProtectedRoute>
+    } />
               <Route path="/moodle-preview" element={<MoodlePreview />} />
               <Route path="/recuperar-password" element={<RecuperarPassword />} />
               <Route path="/aviso-privacidad" element={<AvisoPrivacidad />} />
