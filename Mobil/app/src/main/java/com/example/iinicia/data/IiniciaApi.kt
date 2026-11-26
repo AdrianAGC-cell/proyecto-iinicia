@@ -9,6 +9,86 @@ import retrofit2.http.Path
 import retrofit2.http.Query
 
 interface IiniciaApi {
+    @retrofit2.http.Streaming
+    @GET
+    suspend fun downloadManagement(
+        @retrofit2.http.Url ruta: String
+    ): Response<okhttp3.ResponseBody>
+
+
+    @GET("api/auth/me")
+    suspend fun getRealIdentity(): Response<com.google.gson.JsonObject>
+
+    @GET
+    suspend fun getManagement(
+        @retrofit2.http.Url ruta: String
+    ): Response<com.google.gson.JsonObject>
+
+    @retrofit2.http.Headers("Origin: http://localhost:5173")
+    @POST
+    suspend fun postManagement(
+        @retrofit2.http.Url ruta: String,
+        @Body datos: com.google.gson.JsonObject
+    ): Response<com.google.gson.JsonObject>
+
+    @retrofit2.http.Headers("Origin: http://localhost:5173")
+    @retrofit2.http.PATCH
+    suspend fun patchManagement(
+        @retrofit2.http.Url ruta: String,
+        @Body datos: com.google.gson.JsonObject
+    ): Response<com.google.gson.JsonObject>
+
+
+    @GET("api/auth/courses/{courseId}/assignments/{assignmentId}/cancellation")
+    suspend fun getCancellation(
+        @Path("courseId") courseId: Long,
+        @Path("assignmentId") assignmentId: Long
+    ): Response<com.google.gson.JsonObject>
+
+    @retrofit2.http.Headers("Origin: http://localhost:5173")
+    @POST("api/auth/courses/{courseId}/assignments/{assignmentId}/cancellation")
+    suspend fun requestCancellation(
+        @Path("courseId") courseId: Long,
+        @Path("assignmentId") assignmentId: Long
+    ): Response<com.google.gson.JsonObject>
+
+    @retrofit2.http.Streaming
+    @GET("api/auth/courses/{courseId}/assignments/{assignmentId}/submission-files/{index}")
+    suspend fun downloadSubmission(
+        @Path("courseId") courseId: Long,
+        @Path("assignmentId") assignmentId: Long,
+        @Path("index") index: Int
+    ): Response<okhttp3.ResponseBody>
+
+
+    @GET("api/auth/courses/{courseId}/assignments/{assignmentId}/status")
+    suspend fun getAssignmentStatus(
+        @Path("courseId") courseId: Long,
+        @Path("assignmentId") assignmentId: Long
+    ): Response<com.google.gson.JsonObject>
+
+    @retrofit2.http.Multipart
+    @POST("api/auth/courses/{courseId}/assignments/{assignmentId}/submit")
+    suspend fun submitAssignment(
+        @Path("courseId") courseId: Long,
+        @Path("assignmentId") assignmentId: Long,
+        @retrofit2.http.Part archivos: List<okhttp3.MultipartBody.Part>
+    ): Response<com.google.gson.JsonObject>
+
+    @retrofit2.http.Headers("Origin: http://localhost:5173")
+    @POST("api/auth/courses/{courseId}/assignments/{assignmentId}/confirm")
+    suspend fun confirmAssignment(
+        @Path("courseId") courseId: Long,
+        @Path("assignmentId") assignmentId: Long
+    ): Response<com.google.gson.JsonObject>
+
+
+    @GET("api/auth/courses/{courseId}/assignments")
+    suspend fun getAssignments(
+        @Path("courseId") courseId: Long
+    ): Response<com.google.gson.JsonObject>
+
+
 
     @retrofit2.http.Streaming
     @GET("api/auth/courses/{courseId}/resources/{moduleId}")

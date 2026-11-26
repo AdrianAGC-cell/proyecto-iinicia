@@ -35,6 +35,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.autofill.AutofillNode
+import androidx.compose.ui.autofill.AutofillType
+import androidx.compose.ui.platform.LocalAutofill
+import androidx.compose.ui.platform.LocalAutofillTree
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.DisposableEffect
+import android.view.autofill.AutofillManager
+import android.os.Build
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -51,6 +65,7 @@ import com.example.iinicia.ui.theme.TextMuted
 import com.example.iinicia.viewmodel.AuthState
 import com.example.iinicia.viewmodel.AuthViewModel
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun LoginScreen(
     authViewModel: AuthViewModel,
@@ -65,10 +80,40 @@ fun LoginScreen(
     var regEmail by remember { mutableStateOf("") }
     var regPassword by remember { mutableStateOf("") }
 
+    val context = LocalContext.current
+    val autofill = LocalAutofill.current
+    val autofillTree = LocalAutofillTree.current
+
+    val usuarioNode = remember {
+        AutofillNode(
+            autofillTypes = listOf(AutofillType.Username),
+            onFill = { email = it }
+        )
+    }
+
+    val passwordNode = remember {
+        AutofillNode(
+            autofillTypes = listOf(AutofillType.Password),
+            onFill = { password = it }
+        )
+    }
+
+    DisposableEffect(autofillTree) {
+        autofillTree += usuarioNode
+        autofillTree += passwordNode
+
+        onDispose {
+            autofillTree.children.remove(usuarioNode.id)
+            autofillTree.children.remove(passwordNode.id)
+        }
+    }
     val authState by authViewModel.authState.collectAsState()
 
     LaunchedEffect(authState) {
         if (authState is AuthState.Success) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.getSystemService(AutofillManager::class.java)?.commit()
+            }
             password = ""
             onLoginSuccess()
         }
@@ -175,7 +220,17 @@ fun LoginScreen(
                         errorMessage = null
                     },
                     label = { Text("Usuario, correo o matrícula", color = TextMuted) },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth()
+                        .onGloballyPositioned {
+                            usuarioNode.boundingBox = it.boundsInWindow()
+                        }
+                        .onFocusChanged {
+                            if (it.isFocused) {
+                                autofill?.requestAutofillForNode(usuarioNode)
+                            } else {
+                                autofill?.cancelAutofillForNode(usuarioNode)
+                            }
+                        },
                     singleLine = true
                 )
 
@@ -189,7 +244,20 @@ fun LoginScreen(
                     },
                     label = { Text("Contraseña", color = TextMuted) },
                     visualTransformation = PasswordVisualTransformation(),
-                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Password
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                        .onGloballyPositioned {
+                            passwordNode.boundingBox = it.boundsInWindow()
+                        }
+                        .onFocusChanged {
+                            if (it.isFocused) {
+                                autofill?.requestAutofillForNode(passwordNode)
+                            } else {
+                                autofill?.cancelAutofillForNode(passwordNode)
+                            }
+                        },
                     singleLine = true
                 )
 

@@ -32,7 +32,8 @@ class IiniciaRepository(context: Context) {
     private val moodleClient = OkHttpClient.Builder()
         .cookieJar(MoodleSessionCookies)
         .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(180, TimeUnit.SECONDS)
+        .writeTimeout(120, TimeUnit.SECONDS)
         .build()
 
     private val moodleRetrofit = Retrofit.Builder()
@@ -168,7 +169,7 @@ class IiniciaRepository(context: Context) {
                     id = usuario.id.toString(),
                     name = usuario.nombre,
                     email = usuario.email?.ifBlank { if (tipo == "correo") identificador else "" } ?: (if (tipo == "correo") identificador else ""),
-                    role = "Estudiante",
+                    role = obtenerRolReal(),
                     moodleId = usuario.matricula?.ifBlank { usuario.id.toString() } ?: usuario.id.toString()
                 )
                 currentUser = user
@@ -203,7 +204,7 @@ class IiniciaRepository(context: Context) {
                     id = usuario.id.toString(),
                     name = usuario.nombre,
                     email = usuario.email ?: "",
-                    role = "Estudiante",
+                    role = obtenerRolReal(),
                     moodleId = usuario.matricula?.ifBlank { usuario.id.toString() } ?: usuario.id.toString()
                 )
                 currentUser = u
@@ -279,6 +280,228 @@ class IiniciaRepository(context: Context) {
                 throw e
             } catch (e: Exception) {
                 destino.delete()
+                Result.failure(e)
+            }
+        }
+
+
+    suspend fun getAssignment(
+        courseId: Long,
+        moduleId: Long
+    ): Result<com.google.gson.JsonObject> {
+        return try {
+            val response = moodleApi.getAssignments(courseId)
+            val body = response.body()
+
+            if (!response.isSuccessful || body == null) {
+                throw Exception("No se pudieron consultar las asignaciones")
+            }
+
+            val lista = body.getAsJsonArray("tareas")
+                ?: throw Exception("Respuesta de asignaciones no disponible")
+
+            val tarea = lista.map { it.asJsonObject }
+                .firstOrNull {
+                    it.get("moduloId")?.asLong == moduleId
+                }
+                ?: throw Exception("Asignacion no disponible")
+
+            Result.success(tarea)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+
+    private suspend fun operacionEntrega(
+        operacion: suspend () -> retrofit2.Response<com.google.gson.JsonObject>
+    ): Result<com.google.gson.JsonObject> {
+        return try {
+            val response = operacion()
+            val body = response.body()
+
+            if (!response.isSuccessful || (body == null || (
+                    body.get("success")?.asBoolean != true &&
+                    body.get("conectado")?.asBoolean != true
+                ))) {
+                val mensaje = response.errorBody()?.use {
+                    runCatching {
+                        com.google.gson.JsonParser().parse(it.string())
+                            .asJsonObject.get("error")?.asString
+                    }.getOrNull()
+                }
+
+                throw Exception(
+                    mensaje ?: "No se pudo completar la operacion (${response.code()})"
+                )
+            }
+
+            Result.success(body)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun consultarEntrega(
+        courseId: Long,
+        assignmentId: Long
+    ) = operacionEntrega {
+        moodleApi.getAssignmentStatus(courseId, assignmentId)
+    }
+
+    suspend fun subirEntrega(
+        courseId: Long,
+        assignmentId: Long,
+        archivos: List<okhttp3.MultipartBody.Part>
+    ) = operacionEntrega {
+        moodleApi.submitAssignment(courseId, assignmentId, archivos)
+    }
+
+    suspend fun confirmarEntrega(
+        courseId: Long,
+        assignmentId: Long
+    ) = operacionEntrega {
+        moodleApi.confirmAssignment(courseId, assignmentId)
+    }
+
+
+    suspend fun consultarCancelacion(
+        courseId: Long,
+        assignmentId: Long
+    ) = operacionEntrega {
+        moodleApi.getCancellation(courseId, assignmentId)
+    }
+
+    suspend fun solicitarCancelacion(
+        courseId: Long,
+        assignmentId: Long
+    ) = operacionEntrega {
+        moodleApi.requestCancellation(courseId, assignmentId)
+    }
+
+    suspend fun descargarEntrega(
+        courseId: Long,
+        assignmentId: Long,
+        index: Int,
+        resolver: android.content.ContentResolver,
+        destino: android.net.Uri
+    ): Result<Unit> =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val response = moodleApi.downloadSubmission(
+                    courseId, assignmentId, index
+                )
+
+                val body = response.body()
+
+                if (!response.isSuccessful || body == null) {
+                    response.errorBody()?.close()
+                    body?.close()
+                    throw Exception("No se pudo descargar el archivo")
+                }
+
+                body.use { archivo ->
+                    val salida = resolver.openOutputStream(destino)
+                        ?: throw Exception("No se pudo guardar el documento")
+
+                    salida.use { output ->
+                        archivo.byteStream().use { input ->
+                            input.copyTo(output)
+                        }
+                    }
+                }
+
+                Result.success(Unit)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
+
+    suspend fun identidadReal() = operacionEntrega {
+        moodleApi.getRealIdentity()
+    }
+
+    suspend fun consultarGestion(ruta: String) = operacionEntrega {
+        require(ruta.startsWith("api/auth/"))
+        moodleApi.getManagement(ruta)
+    }
+
+    suspend fun crearGestion(
+        ruta: String,
+        datos: com.google.gson.JsonObject
+    ) = operacionEntrega {
+        require(ruta.startsWith("api/auth/"))
+        moodleApi.postManagement(ruta, datos)
+    }
+
+    suspend fun actualizarGestion(
+        ruta: String,
+        datos: com.google.gson.JsonObject
+    ) = operacionEntrega {
+        require(ruta.startsWith("api/auth/"))
+        moodleApi.patchManagement(ruta, datos)
+    }
+
+    private suspend fun obtenerRolReal(): String {
+        val identidad = identidadReal().getOrThrow()
+
+        val roles = identidad.getAsJsonObject("usuario")
+            ?.getAsJsonArray("roles")
+            ?: throw Exception("No se pudieron verificar los roles")
+
+        return roles.mapNotNull {
+            if (it.isJsonPrimitive) it.asString else null
+        }.joinToString(", ").ifBlank {
+            "Sin rol asignado"
+        }
+    }
+
+
+    suspend fun descargarDocumentoDocente(
+        ruta: String,
+        resolver: android.content.ContentResolver,
+        destino: android.net.Uri
+    ): Result<Unit> =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                require(
+                    ruta.matches(
+                        Regex("api/auth/teacher/courses/[0-9]+/assignments/[0-9]+/students/[0-9]+/files/[0-9]+")
+                    )
+                )
+
+                val response = moodleApi.downloadManagement(ruta)
+                val body = response.body()
+
+                if (!response.isSuccessful || body == null) {
+                    response.errorBody()?.close()
+                    body?.close()
+                    throw Exception("No se pudo descargar el archivo")
+                }
+
+                body.use { archivo ->
+                    val salida = resolver.openOutputStream(destino)
+                        ?: throw Exception("No se pudo guardar el archivo")
+
+                    salida.use { output ->
+                        archivo.byteStream().use { input ->
+                            input.copyTo(output)
+                        }
+                    }
+                }
+
+                Result.success(Unit)
+
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
                 Result.failure(e)
             }
         }
@@ -390,9 +613,9 @@ class IiniciaRepository(context: Context) {
             if (response.isSuccessful && !response.body().isNullOrEmpty()) {
                 return Result.success(response.body()!!)
             }
-            Result.success(demoNotifications)
+            Result.success(emptyList<NotificationDto>())
         } catch (e: Exception) {
-            Result.success(demoNotifications)
+            Result.success(emptyList<NotificationDto>())
         }
     }
 

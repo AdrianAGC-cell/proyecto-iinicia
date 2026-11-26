@@ -334,6 +334,15 @@ fun CourseDetailScreen(
 
         // Modal de interacción con actividades Moodle (Foro / Tarea / Evaluación)
         selectedActivityDialog?.let { activity ->
+            if (activity.dueDate == "assign") {
+                AssignmentDialog(
+                    courseId = courseId.toLong(),
+                    moduleId = activity.id.toLong(),
+                    title = activity.title,
+                    grade = activity.grade,
+                    onClose = { selectedActivityDialog = null }
+                )
+            } else {
             androidx.compose.material3.AlertDialog(
                 onDismissRequest = { selectedActivityDialog = null },
                 title = {
@@ -397,6 +406,7 @@ fun CourseDetailScreen(
                     }
                 }
             )
+            }
         }
     }
 }
