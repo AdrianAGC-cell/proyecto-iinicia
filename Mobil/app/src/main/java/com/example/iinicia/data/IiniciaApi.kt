@@ -44,6 +44,19 @@ interface IiniciaApi {
         @Body datos: com.google.gson.JsonObject
     ): Response<com.google.gson.JsonObject>
 
+
+    @POST("auth/v1/verify")
+    suspend fun verificarSupabase(
+        @Header("apikey") apiKey: String,
+        @Body datos: com.google.gson.JsonObject
+    ): Response<com.google.gson.JsonObject>
+
+    @POST("auth/v1/resend")
+    suspend fun reenviarSupabase(
+        @Header("apikey") apiKey: String,
+        @Body datos: com.google.gson.JsonObject
+    ): Response<com.google.gson.JsonObject>
+
     @POST("auth/v1/recover")
     suspend fun recuperarSupabase(
         @Header("apikey") apiKey: String,

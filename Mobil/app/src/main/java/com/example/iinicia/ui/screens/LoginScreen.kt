@@ -119,6 +119,17 @@ fun LoginScreen(
     }
 
 
+
+    val correoPendiente by
+        authViewModel.correoPendiente.collectAsState()
+
+    val mensajeOtp by
+        authViewModel.mensajeOtp.collectAsState()
+
+    var codigoOtp by remember(correoPendiente) {
+        mutableStateOf("")
+    }
+
     val mensajeCuenta by authViewModel.mensajeCuenta.collectAsState()
 
     var mostrarRecuperacion by remember {
@@ -338,6 +349,20 @@ fun LoginScreen(
                     )
                 }
 
+
+                TextButton(
+                    enabled = email.contains("@") &&
+                        authState !is AuthState.Loading,
+                    onClick = {
+                        authViewModel.abrirVerificacion(email)
+                    }
+                ) {
+                    Text(
+                        "Verificar mi correo",
+                        color = CyanAccent
+                    )
+                }
+
                 // Register Link
                 TextButton(
                     onClick = { showRegisterDialog = true }
@@ -436,6 +461,111 @@ fun LoginScreen(
         )
     }
 
+
+    if (correoPendiente.isNotBlank()) {
+        AlertDialog(
+            containerColor = CardBackgroundDark,
+            onDismissRequest = {
+                authViewModel.cancelarVerificacion()
+            },
+            title = {
+                Text(
+                    "Verificacion de correo",
+                    color = CyanAccent,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column(
+                    verticalArrangement =
+                        Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        "Ingresa el codigo enviado a:",
+                        color = Color.White
+                    )
+
+                    Text(
+                        correoPendiente,
+                        color = CyanAccent,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    OutlinedTextField(
+                        value = codigoOtp,
+                        onValueChange = {
+                            codigoOtp = it.filter { c ->
+                                c in '0'..'9'
+                            }.take(6)
+                        },
+                        label = { Text("Codigo de seis digitos") },
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Number
+                        ),
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        enabled = authState !is AuthState.Loading
+                    )
+
+                    Text(
+                        "Revisa tambien tu carpeta de spam.",
+                        color = TextMuted,
+                        fontSize = 12.sp
+                    )
+
+                    if (mensajeOtp.isNotBlank()) {
+                        Text(
+                            mensajeOtp,
+                            color = Color.White,
+                            fontSize = 12.sp
+                        )
+                    }
+
+                    TextButton(
+                        enabled = authState !is AuthState.Loading,
+                        onClick = {
+                            authViewModel.reenviarCodigo()
+                        }
+                    ) {
+                        Text(
+                            "Reenviar codigo",
+                            color = CyanAccent
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    enabled = codigoOtp.length == 6 &&
+                        authState !is AuthState.Loading,
+                    onClick = {
+                        authViewModel.verificarCodigo(codigoOtp)
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = CyanBright
+                    )
+                ) {
+                    Text(
+                        if (authState is AuthState.Loading)
+                            "Procesando..."
+                        else "Confirmar y entrar",
+                        color = Color.White
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    enabled = authState !is AuthState.Loading,
+                    onClick = {
+                        authViewModel.cancelarVerificacion()
+                    }
+                ) {
+                    Text("Cancelar", color = TextMuted)
+                }
+            }
+        )
+    }
+
     // Modal de Registro Rápido en Android
     if (showRegisterDialog) {
         AlertDialog(
@@ -479,6 +609,7 @@ fun LoginScreen(
                         if (regEmail.isNotBlank()) {
                             showRegisterDialog = false
                             authViewModel.register(regName, regEmail.trim(), regPassword)
+                            regPassword = ""
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = CyanBright)

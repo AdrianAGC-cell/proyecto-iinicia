@@ -17,6 +17,8 @@ interface AuthContextType {
   loading: boolean;
   login: (email: string, password?: string) => Promise<AuthResponse>;
   register: (name: string, email: string, password: string, programId?: string) => Promise<AuthResponse>;
+  verifyEmailOtp: (email: string, token: string) => Promise<AuthResponse>;
+  resendEmailOtp: (email: string) => Promise<AuthResponse>;
   loginWithGoogle: () => Promise<AuthResponse>;
   logout: () => Promise<void>;
   switchRole?: (newRole: Role) => void;
@@ -369,6 +371,75 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+
+  const verifyEmailOtp = async (
+    email: string,
+    token: string
+  ): Promise<AuthResponse> => {
+    if (!/^\d{6}$/.test(token)) {
+      return {
+        success: false,
+        error: 'Ingresa un codigo valido de seis digitos.'
+      };
+    }
+
+    try {
+      const { data, error } = await supabase.auth.verifyOtp({
+        email: email.trim().toLowerCase(),
+        token,
+        type: 'signup'
+      });
+
+      if (error || !data.user || !data.session) {
+        return {
+          success: false,
+          error: 'Codigo incorrecto, vencido o no verificable.'
+        };
+      }
+
+      const identidad = await buildUserFromSupabase(data.user);
+      setUser(identidad);
+
+      return {
+        success: true,
+        role: identidad.role
+      };
+    } catch (_) {
+      return {
+        success: false,
+        error: 'No se pudo completar el acceso. Intenta iniciar sesion.'
+      };
+    }
+  };
+
+  const resendEmailOtp = async (
+    email: string
+  ): Promise<AuthResponse> => {
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: email.trim().toLowerCase(),
+        options: {
+          emailRedirectTo: window.location.origin
+        }
+      });
+
+      if (error) {
+        return {
+          success: false,
+          error: 'No se pudo reenviar el correo. Espera un momento e intenta nuevamente.'
+        };
+      }
+
+      return { success: true };
+    } catch (_) {
+      return {
+        success: false,
+        error: 'Error de conexion con el servicio de correo.'
+      };
+    }
+  };
+
   // Inicio de sesión con Google OAuth
   const loginWithGoogle = async (): Promise<AuthResponse> => {
     try {
@@ -389,7 +460,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.origin
+          redirectTo: window.location.origin + '/login'
         }
       });
 
@@ -446,6 +517,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loading,
         login,
         register,
+        verifyEmailOtp,
+        resendEmailOtp,
         loginWithGoogle,
         logout,
         switchRole,

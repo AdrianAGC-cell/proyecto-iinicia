@@ -1,5 +1,5 @@
 import { rutaPorRol } from '../security/roles';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Lock, Mail, ArrowRight, Loader2, Database, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -10,12 +10,31 @@ export const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const { login, loginWithGoogle } = useAuth();
+  const {
+    login,
+    loginWithGoogle,
+    user,
+    loading: authLoading
+  } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      navigate(rutaPorRol(user.role), {
+        replace: true
+      });
+    }
+  }, [authLoading, user, navigate]);
 
   const handleFormLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
+
+    if (!email.trim() || !password) {
+      setErrorMsg('Ingresa tu usuario, correo o matrícula y contraseña.');
+      return;
+    }
+
     setLoading(true);
 
     const res = await login(email, password);
@@ -105,7 +124,7 @@ export const Login: React.FC = () => {
             </div>
           )}
 
-          <form onSubmit={handleFormLogin} className="space-y-4">
+          <form noValidate onSubmit={handleFormLogin} className="space-y-4">
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
                 Usuario, correo o matrícula
@@ -166,6 +185,13 @@ export const Login: React.FC = () => {
               )}
             </button>
           </form>
+
+          <Link
+            to="/registro?verificar=true"
+            className="block text-center text-xs font-bold text-[#22abe2] hover:underline"
+          >
+            Verificar mi correo electrónico
+          </Link>
 
           <div className="text-center text-xs text-slate-500 pt-2 border-t border-slate-100">
             ¿Aún no tienes cuenta?{' '}

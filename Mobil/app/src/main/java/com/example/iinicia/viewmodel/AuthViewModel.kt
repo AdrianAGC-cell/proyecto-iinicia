@@ -95,6 +95,85 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         _mensajeCuenta.value = ""
     }
 
+
+    private val _correoPendiente = MutableStateFlow("")
+    val correoPendiente = _correoPendiente.asStateFlow()
+
+    private val _mensajeOtp = MutableStateFlow("")
+    val mensajeOtp = _mensajeOtp.asStateFlow()
+
+    private var reenviarDespues = 0L
+
+    fun cancelarVerificacion() {
+        if (_authState.value is AuthState.Loading) return
+        _correoPendiente.value = ""
+        _mensajeOtp.value = ""
+        _authState.value = AuthState.Idle
+    }
+
+    fun abrirVerificacion(correo: String) {
+        if (_authState.value is AuthState.Loading) return
+        if (correo.isBlank()) return
+        _correoPendiente.value = correo.trim().lowercase()
+        _mensajeOtp.value = ""
+        _authState.value = AuthState.Idle
+    }
+
+    fun verificarCodigo(codigo: String) {
+        if (_authState.value is AuthState.Loading) return
+
+        val correo = _correoPendiente.value
+        if (correo.isBlank()) return
+
+        viewModelScope.launch {
+            _authState.value = AuthState.Loading
+            _mensajeOtp.value = ""
+
+            repository.verificarCorreo(correo, codigo)
+                .onSuccess {
+                    _correoPendiente.value = ""
+                    _authState.value = AuthState.Success(it.user)
+                }
+                .onFailure {
+                    _mensajeOtp.value =
+                        it.message ?: "No se pudo verificar"
+                    _authState.value = AuthState.Idle
+                }
+        }
+    }
+
+    fun reenviarCodigo() {
+        if (_authState.value is AuthState.Loading) return
+
+        if (System.currentTimeMillis() < reenviarDespues) {
+            _mensajeOtp.value =
+                "Espera al menos 60 segundos entre solicitudes."
+            return
+        }
+
+        val correo = _correoPendiente.value
+        if (correo.isBlank()) return
+
+        viewModelScope.launch {
+            _authState.value = AuthState.Loading
+            _mensajeOtp.value = ""
+
+            repository.reenviarCodigoCorreo(correo)
+                .onSuccess {
+                    reenviarDespues =
+                        System.currentTimeMillis() + 60000L
+                    _mensajeOtp.value =
+                        "Solicitud de reenvio aceptada. Revisa tu correo y spam."
+                }
+                .onFailure {
+                    _mensajeOtp.value =
+                        it.message ?: "No se pudo reenviar"
+                }
+
+            _authState.value = AuthState.Idle
+        }
+    }
+
     fun register(name: String, email: String, pass: String) {
         if (_authState.value is AuthState.Loading) return
 
@@ -104,8 +183,11 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             repository.registrarAspirante(name, email, pass)
                 .onSuccess {
                     _authState.value = AuthState.Idle
-                    _mensajeCuenta.value =
-                        "Solicitud de registro procesada. Revisa tu correo para confirmar la cuenta."
+                    _correoPendiente.value =
+                        email.trim().lowercase()
+                    _mensajeOtp.value = ""
+                    reenviarDespues =
+                        System.currentTimeMillis() + 60000L
                 }
                 .onFailure {
                     _authState.value = AuthState.Error(

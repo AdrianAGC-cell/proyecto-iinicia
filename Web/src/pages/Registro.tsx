@@ -1,36 +1,41 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Lock, Mail, User, ShieldCheck, ArrowRight, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Lock, Mail, User, ArrowRight, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { rutaPorRol } from '../security/roles';
 import { useAuth } from '../context/AuthContext';
 import { MOCK_PROGRAMS } from '../data/mockData';
 
 export const Registro: React.FC = () => {
+  const [params] = useSearchParams();
+  const recuperarOtp = params.get('verificar') === 'true';
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [programId, setProgramId] = useState('lic-ia-datos');
-  const [isCaptchaValid, setIsCaptchaValid] = useState(false);
-  const [agreeTerms, setAgreeTerms] = useState(true);
+  const [agreeTerms, setAgreeTerms] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [registeredSuccess, setRegisteredSuccess] = useState(false);
-  const [needsConfirmation, setNeedsConfirmation] = useState(false);
+  const [registeredSuccess, setRegisteredSuccess] = useState(recuperarOtp);
+  const [needsConfirmation, setNeedsConfirmation] = useState(recuperarOtp);
 
-  const { register, loginWithGoogle } = useAuth();
+  const [otp, setOtp] = useState('');
+  const [notice, setNotice] = useState('');
+  const [resendUntil, setResendUntil] = useState(0);
+  const { register, loginWithGoogle, verifyEmailOtp, resendEmailOtp } = useAuth();
   const navigate = useNavigate();
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
 
-    if (!isCaptchaValid) {
-      setErrorMsg('Por favor verifica el control de seguridad anti-bot marcando la casilla.');
+    if (!agreeTerms) {
+      setErrorMsg('Debes aceptar los terminos institucionales.');
       return;
     }
 
-    if (password.length < 6) {
-      setErrorMsg('La contraseña debe tener al menos 6 caracteres.');
+    if (password.length < 8) {
+      setErrorMsg('La contraseña debe tener al menos 8 caracteres.');
       return;
     }
 
@@ -44,6 +49,8 @@ export const Registro: React.FC = () => {
     }
 
     if (res.needsEmailConfirmation) {
+      setPassword('');
+      setResendUntil(Date.now() + 60000);
       setNeedsConfirmation(true);
       setRegisteredSuccess(true);
     } else {
@@ -53,46 +60,173 @@ export const Registro: React.FC = () => {
 
   const handleGoogleRegister = async () => {
     setErrorMsg(null);
+
+    if (!agreeTerms) {
+      setErrorMsg('Debes aceptar los terminos institucionales antes de continuar con Google.');
+      return;
+    }
     const res = await loginWithGoogle();
     if (!res.success && res.error) {
       setErrorMsg(res.error);
     }
   };
 
+
+  const confirmarCodigo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg(null);
+    setNotice('');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setErrorMsg('Ingresa un correo electronico valido.');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const res = await verifyEmailOtp(email, otp);
+
+      if (!res.success) {
+        setErrorMsg(res.error || 'No se pudo verificar el correo.');
+        return;
+      }
+
+      navigate(rutaPorRol(res.role || 'aspirante'), {
+        replace: true
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const reenviarCodigo = async () => {
+    setErrorMsg(null);
+    setNotice('');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setErrorMsg('Ingresa un correo electronico valido.');
+      return;
+    }
+
+
+    if (Date.now() < resendUntil) {
+      setErrorMsg('Espera al menos 60 segundos entre solicitudes.');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const res = await resendEmailOtp(email);
+
+      if (!res.success) {
+        setErrorMsg(res.error || 'No se pudo reenviar el correo.');
+        return;
+      }
+
+      setResendUntil(Date.now() + 60000);
+      setOtp('');
+      setNotice('Solicitud de reenvio aceptada. Revisa tu correo y spam.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (registeredSuccess && needsConfirmation) {
     return (
-      <div className="min-h-[85vh] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-md w-full">
-          <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-xl space-y-6 text-center animate-fadeIn">
-            <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto border border-emerald-100 shadow-xs">
-              <CheckCircle2 className="w-9 h-9" />
-            </div>
+      <div className="min-h-[85vh] flex items-center justify-center py-12 px-4">
+        <div className="max-w-md w-full bg-white rounded-3xl p-8 border border-slate-200 shadow-xl space-y-6">
 
-            <div className="space-y-2">
-              <h2 className="text-xl font-black text-slate-900 tracking-tight">
-                ¡Revisa tu Correo Institucional!
-              </h2>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Hemos enviado un enlace de confirmación a:
-              </p>
-              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 font-mono text-xs font-bold text-slate-800 break-all">
-                {email}
-              </div>
-              <p className="text-xs text-slate-500 leading-relaxed pt-2">
-                Abre tu correo (revisa también tu carpeta de spam o promociones) y haz clic en el enlace para activar tu cuenta de aspirante en I²NICIA.
-              </p>
-            </div>
+          <img
+            src="/logo-iinicia.png"
+            alt="IINICIA"
+            className="h-16 w-auto mx-auto"
+          />
 
-            <div className="pt-4 border-t border-slate-100 flex flex-col gap-2">
-              <Link
-                to="/login"
-                className="w-full py-3 rounded-xl bg-[#22abe2] hover:bg-[#1b9ad0] text-white font-bold text-xs shadow-md shadow-[#22abe2]/20 transition flex items-center justify-center gap-2"
-              >
-                <span>Ir a Iniciar Sesión</span>
-                <ArrowRight className="w-4 h-4" />
-              </Link>
-            </div>
+          <h2 className="text-xl font-black text-center text-slate-900">
+            Verificacion de correo
+          </h2>
+
+          <div className="bg-sky-50 border border-sky-100 rounded-2xl p-5 text-center space-y-3">
+            <Mail className="w-10 h-10 mx-auto text-[#22abe2]" />
+            <p className="text-sm font-bold">Revisa tu bandeja de entrada</p>
+            <p className="text-xs text-slate-600">
+              Solicitamos el codigo de confirmacion para:
+            </p>
+            <input
+              type="email"
+              aria-label="Correo electronico"
+              autoComplete="email"
+              value={email}
+              readOnly={!recuperarOtp}
+              disabled={loading}
+              onChange={e => {
+                setEmail(e.target.value);
+                setOtp('');
+                setNotice('');
+              }}
+              placeholder="correo@gmail.com"
+              className="w-full p-3 text-center text-sm rounded-xl border border-slate-200 bg-white focus:ring-2 focus:ring-[#22abe2] focus:outline-none"
+            />
+            <p className="text-xs text-slate-500">
+              Revisa tambien spam. Puedes utilizar el enlace incluido en el correo.
+            </p>
           </div>
+
+          {errorMsg && (
+            <div role="alert" className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              {errorMsg}
+            </div>
+          )}
+
+          {notice && (
+            <div role="status" className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs flex gap-2">
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              {notice}
+            </div>
+          )}
+
+          <form noValidate onSubmit={confirmarCodigo} className="space-y-4">
+            <label className="block text-xs font-bold text-slate-700 text-center">
+              CODIGO DE VERIFICACION
+            </label>
+
+            <input
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              required
+              value={otp}
+              onChange={e => setOtp(e.target.value.replace(/[^0-9]/g, ''))}
+              placeholder="123456"
+              className="w-full p-4 text-center text-xl tracking-widest rounded-xl border border-slate-200 focus:ring-2 focus:ring-[#22abe2] focus:outline-none"
+            />
+
+            <button
+              type="submit"
+              disabled={loading || otp.length !== 6}
+              className="w-full py-3 rounded-xl bg-[#22abe2] text-white font-bold text-sm disabled:opacity-50"
+            >
+              {loading ? 'Procesando...' : 'Confirmar y entrar'}
+            </button>
+          </form>
+
+          <button
+            type="button"
+            onClick={reenviarCodigo}
+            disabled={loading}
+            className="w-full text-sm font-bold text-[#22abe2] disabled:opacity-50"
+          >
+            Reenviar codigo
+          </button>
+
+          <Link
+            to="/login"
+            className="block text-center text-xs text-slate-500"
+          >
+            Volver a iniciar sesion
+          </Link>
         </div>
       </div>
     );
@@ -203,7 +337,7 @@ export const Registro: React.FC = () => {
                 <input
                   type="password"
                   required
-                  placeholder="Mínimo 6 caracteres"
+                  placeholder="Mínimo 8 caracteres"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-[#22abe2] focus:outline-none"
@@ -226,23 +360,6 @@ export const Registro: React.FC = () => {
                   </option>
                 ))}
               </select>
-            </div>
-
-            {/* Verificación de Seguridad Anti-bot */}
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
-              <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-700">
-                <input
-                  type="checkbox"
-                  checked={isCaptchaValid}
-                  onChange={(e) => setIsCaptchaValid(e.target.checked)}
-                  className="w-4 h-4 text-[#22abe2] rounded border-slate-300 focus:ring-[#22abe2]"
-                />
-                <span>No soy un robot</span>
-              </label>
-              <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400">
-                <ShieldCheck className="w-3.5 h-3.5 text-[#22abe2]" />
-                <span>Control Anti-bot</span>
-              </div>
             </div>
 
             <div className="text-[11px] text-slate-500 space-y-1">

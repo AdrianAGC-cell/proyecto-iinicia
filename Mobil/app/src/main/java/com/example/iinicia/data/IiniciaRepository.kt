@@ -416,6 +416,147 @@ class IiniciaRepository(context: Context) {
         }
     }
 
+
+    suspend fun verificarCorreo(
+        correo: String,
+        codigo: String
+    ): Result<LoginResponse> {
+        return try {
+
+            require(codigo.matches(Regex("[0-9]{6}"))) {
+                "Ingresa un codigo de seis digitos"
+            }
+
+            val cuerpo = com.google.gson.JsonObject().apply {
+                addProperty("email", correo.trim().lowercase())
+                addProperty("token", codigo)
+                addProperty("type", "signup")
+            }
+
+            val respuesta = supabaseApi.verificarSupabase(
+                SupabaseClient.SUPABASE_KEY,
+                cuerpo
+            )
+
+            if (!respuesta.isSuccessful) {
+                respuesta.errorBody()?.close()
+                throw Exception("Codigo incorrecto o vencido")
+            }
+
+            val sesion = respuesta.body()
+                ?: throw Exception("Sesion no disponible")
+
+            val token = sesion.get("access_token")
+                ?.takeUnless { it.isJsonNull }
+                ?.asString
+                ?: throw Exception("Sesion no disponible")
+
+            val identidad = supabaseApi.identidadSupabase(
+                SupabaseClient.SUPABASE_KEY,
+                "Bearer $token"
+            )
+
+            val datos = identidad.body()
+
+            if (
+                !identidad.isSuccessful ||
+                datos == null ||
+                datos.get("email_confirmed_at") == null ||
+                datos.get("email_confirmed_at").isJsonNull
+            ) {
+                throw Exception("No se pudo verificar la cuenta")
+            }
+
+            val emailReal = datos.get("email").asString
+
+            require(emailReal.equals(correo.trim(), true)) {
+                "La identidad no coincide"
+            }
+
+            val nombre = datos.getAsJsonObject("user_metadata")
+                ?.get("full_name")
+                ?.takeUnless { it.isJsonNull }
+                ?.asString ?: emailReal
+
+            val aspirante = UserDto(
+                id = datos.get("id").asString,
+                name = nombre,
+                email = emailReal,
+                role = "aspirante",
+                moodleId = ""
+            )
+
+            MoodleSessionCookies.clear()
+            tokenManager.clear()
+
+            val usuario = resolverUsuarioInstitucional(
+                token,
+                aspirante
+            )
+
+            tokenSupabase = token
+
+            refreshSupabase = sesion.get("refresh_token")
+                ?.takeUnless { it.isJsonNull }
+                ?.asString
+
+            renovarAntes = System.currentTimeMillis() +
+                30 * 60 * 1000L
+
+            currentUser = usuario
+
+            Result.success(
+                LoginResponse(
+                    token = "",
+                    user = usuario
+                )
+            )
+
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            tokenAspirante = null
+            tokenSupabase = null
+            refreshSupabase = null
+            renovarAntes = 0L
+            currentUser = null
+            MoodleSessionCookies.clear()
+            tokenManager.clear()
+            Result.failure(e)
+        }
+    }
+
+    suspend fun reenviarCodigoCorreo(
+        correo: String
+    ): Result<Unit> {
+        return try {
+
+            val cuerpo = com.google.gson.JsonObject().apply {
+                addProperty("email", correo.trim().lowercase())
+                addProperty("type", "signup")
+            }
+
+            val respuesta = supabaseApi.reenviarSupabase(
+                SupabaseClient.SUPABASE_KEY,
+                cuerpo
+            )
+
+            if (!respuesta.isSuccessful) {
+                respuesta.errorBody()?.close()
+                throw Exception(
+                    "No se pudo reenviar. Espera un momento."
+                )
+            }
+
+            Result.success(Unit)
+
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun recuperarCuenta(correo: String): Result<Unit> {
         return try {
 

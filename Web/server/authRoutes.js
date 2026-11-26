@@ -1,3 +1,4 @@
+import { SQLiteSessionStore } from './sessionStore.js';
 import { revocarIdentidad } from './revocarIdentidad.js';
 import { consultarRoles } from './moodleRoles.js';
 import express from 'express';
@@ -15,6 +16,7 @@ export function configurarAutenticacion(app) {
 
     // Las conexiones publicas deben utilizar HTTPS.
     app.use(session({
+        store: new SQLiteSessionStore(),
         name: 'iinicia.sid',
         secret: process.env.SESSION_SECRET,
         resave: false,

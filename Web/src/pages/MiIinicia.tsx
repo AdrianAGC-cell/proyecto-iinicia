@@ -1,3 +1,7 @@
+
+import { useState as useEstadoAviso } from 'react';
+import { AvisoInstitucional } from '../components/common/AvisoInstitucional';
+
 import React, { useState, useEffect } from 'react';
 import { 
   Sparkles, 
@@ -21,7 +25,10 @@ import { SafeImage } from '../components/common/SafeImage';
 
 import { Course } from '../types';
 
-export const MiIinicia: React.FC = () => {
+const MiIiniciaContenido: React.FC<{
+  mostrarAviso: (mensaje: string) => void;
+}> = ({ mostrarAviso }) => {
+
   const { user, triggerMoodleSSO } = useAuth();
   const [activeTab, setActiveTab] = useState<'cursos' | 'entregas' | 'calificaciones' | 'tramites'>('cursos');
   const [idCardOpen, setIdCardOpen] = useState(false);
@@ -461,7 +468,7 @@ export const MiIinicia: React.FC = () => {
           <div className="flex items-center justify-between">
             <h3 className="text-base font-bold text-slate-900">Consulta académica</h3>
             <button
-              onClick={() => alert('La emisión de boletas oficiales todavía no está habilitada.')}
+              onClick={() => mostrarAviso('La emisión de boletas oficiales todavía no está habilitada.')}
               className="px-4 py-2 rounded-xl bg-[#22abe2]/10 text-[#22abe2] text-xs font-bold hover:bg-[#22abe2]/20 transition flex items-center gap-1.5"
             >
               <Download className="w-4 h-4" />
@@ -512,7 +519,7 @@ export const MiIinicia: React.FC = () => {
             <h4 className="font-bold text-slate-900 text-sm">Constancia de Estudios Oficial</h4>
             <p className="text-xs text-slate-500">Documento membretado con código QR para trámites de visa, empleo o beca.</p>
             <button
-              onClick={() => alert('La emisión de constancias todavía no está habilitada.')}
+              onClick={() => mostrarAviso('La emisión de constancias todavía no está habilitada.')}
               className="w-full py-2 rounded-xl bg-[#22abe2]/10 text-[#22abe2] text-xs font-bold hover:bg-[#22abe2]/20 transition"
             >
               Solicitar Constancia
@@ -524,7 +531,7 @@ export const MiIinicia: React.FC = () => {
             <h4 className="font-bold text-slate-900 text-sm">Biblioteca Virtual e Investigación</h4>
             <p className="text-xs text-slate-500">Acceso a más de 500,000 papers académicos, libros electrónicos y repositorios técnicos.</p>
             <button
-              onClick={() => alert('Accediendo a la red de bibliotecas digitales asociadas a I²NICIA...')}
+              onClick={() => mostrarAviso('La integración con bibliotecas digitales todavía no está habilitada.')}
               className="w-full py-2 rounded-xl bg-[#22abe2]/10 text-[#22abe2] text-xs font-bold hover:bg-[#22abe2]/20 transition"
             >
               Abrir Biblioteca Digital
@@ -536,7 +543,7 @@ export const MiIinicia: React.FC = () => {
             <h4 className="font-bold text-slate-900 text-sm">Finanzas y Colegiaturas</h4>
             <p className="text-xs text-slate-500">Consulta de recibos fiscales CFDI, facturación en línea y pagos automatizados.</p>
             <button
-              onClick={() => alert('La consulta financiera todavía no está habilitada.')}
+              onClick={() => mostrarAviso('La consulta financiera todavía no está habilitada.')}
               className="w-full py-2 rounded-xl bg-[#22abe2]/10 text-[#22abe2] text-xs font-bold hover:bg-[#22abe2]/20 transition"
             >
               Ver Finanzas Escolares
@@ -545,5 +552,23 @@ export const MiIinicia: React.FC = () => {
         </div>
       )}
     </div>
+  );
+};
+
+
+export const MiIinicia: React.FC = () => {
+  const [aviso, setAviso] =
+    useEstadoAviso<string | null>(null);
+
+  return (
+    <>
+      <MiIiniciaContenido mostrarAviso={setAviso} />
+      {aviso && (
+        <AvisoInstitucional
+          mensaje={aviso}
+          cerrar={() => setAviso(null)}
+        />
+      )}
+    </>
   );
 };
