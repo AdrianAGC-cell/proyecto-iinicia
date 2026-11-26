@@ -131,6 +131,7 @@ export function configurarCursosMoodle(app) {
         .filter(s => s.visible !== 0 && s.uservisible !== false)
         .map(seccion => ({
           id: seccion.id,
+          numero: seccion.section,
           nombre: seccion.name || 'General',
           resumen: seccion.summary || '',
           visible: seccion.visible,

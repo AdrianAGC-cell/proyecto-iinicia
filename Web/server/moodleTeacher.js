@@ -34,6 +34,119 @@ export function configurarProfesorMoodle(app) {
   }
 
 
+
+  app.post(
+    '/api/auth/teacher/courses/:courseId/assignments',
+    async (req, res) => {
+
+      res.set('Cache-Control', 'no-store');
+
+      const rechazar = (status, error) =>
+        res.status(status).json({ success: false, error });
+
+      if (!req.session?.usuario || !req.session?.moodleToken) {
+        return rechazar(401, 'Sesion no activa');
+      }
+
+      const origenes = (
+        process.env.WEB_ORIGINS || 'http://localhost:5173'
+      ).split(',').map(x => x.trim());
+
+      if (!origenes.includes(req.get('origin')) ||
+          !req.is('application/json')) {
+        return rechazar(403, 'Solicitud no permitida');
+      }
+
+      const courseId = Number(req.params.courseId);
+
+      if (!Number.isSafeInteger(courseId) || courseId <= 1) {
+        return rechazar(400, 'Curso invalido');
+      }
+
+      const {
+        section, name, description,
+        availablefrom, duedate, cutoffdate,
+        grade, maxfiles, maxbytes, visible
+      } = req.body || {};
+
+      if (
+        typeof name !== 'string' ||
+        !name.trim() ||
+        name.length > 200 ||
+        typeof description !== 'string' ||
+        description.length > 10000 ||
+        typeof visible !== 'boolean' ||
+        ![
+          section, availablefrom, duedate, cutoffdate,
+          grade, maxfiles, maxbytes
+        ].every(Number.isSafeInteger)
+      ) {
+        return rechazar(400, 'Datos de asignacion invalidos');
+      }
+
+      try {
+
+        const datos = await consultar(
+          req.session.moodleToken,
+          'local_iinicia_create_assignment',
+          {
+            courseid: String(courseId),
+            section: String(section),
+            name: name.trim(),
+            description,
+            availablefrom: String(availablefrom),
+            duedate: String(duedate),
+            cutoffdate: String(cutoffdate),
+            grade: String(grade),
+            maxfiles: String(maxfiles),
+            maxbytes: String(maxbytes),
+            visible: visible ? '1' : '0'
+          }
+        );
+
+        if (
+          datos.success !== true ||
+          Number(datos.courseid) !== courseId ||
+          !Number.isSafeInteger(Number(datos.assignid)) ||
+          Number(datos.assignid) <= 0 ||
+          !Number.isSafeInteger(Number(datos.cmid)) ||
+          Number(datos.cmid) <= 0
+        ) {
+          throw new Error('Respuesta inesperada');
+        }
+
+        return res.status(201).json({
+          success: true,
+          cursoId: courseId,
+          asignacionId: datos.assignid,
+          moduloId: datos.cmid
+        });
+
+      } catch (error) {
+
+        const codigo = error.moodleCode || '';
+
+        console.error('Creacion de asignacion:', codigo);
+
+        if ([
+          'nopermissions',
+          'requireloginerror',
+          'accessexception',
+          'webservice_access_exception'
+        ].includes(codigo)) {
+          return rechazar(403, 'No tienes permiso para crear actividades');
+        }
+
+        if (codigo === 'invalidparameter') {
+          return rechazar(400, 'Revisa las fechas y limites de la asignacion');
+        }
+
+        return rechazar(502, 'Moodle no pudo confirmar la creacion');
+
+      }
+    }
+  );
+
   app.get(
     '/api/auth/courses/:courseId/assignments/:assignmentId/permissions',
     async (req, res) => {

@@ -1,3 +1,5 @@
+import { useAuth } from '../context/AuthContext';
+import { CrearAsignacion } from '../components/moodle/CrearAsignacion';
 import React, { useEffect, useState } from 'react';
 import { ArrowLeft, BookOpen, FileText, Loader2 } from 'lucide-react';
 
@@ -17,6 +19,7 @@ type Actividad = {
 
 type Seccion = {
   id: number;
+  numero: number;
   nombre: string;
   actividades: Actividad[];
 };
@@ -32,6 +35,9 @@ export const AulaVirtual: React.FC<Props> = ({
   courseName,
   onBack
 }) => {
+  const { user } = useAuth();
+  const [revision, setRevision] = useState(0);
+
   const [secciones, setSecciones] = useState<Seccion[]>([]);
   const [tareas, setTareas] = useState<Tarea[]>([]);
   const [errorTareas, setErrorTareas] = useState('');
@@ -115,7 +121,7 @@ export const AulaVirtual: React.FC<Props> = ({
     cargar();
 
     return () => controller.abort();
-  }, [courseId]);
+  }, [courseId, revision]);
 
   return (
     <div className="space-y-6">
@@ -137,6 +143,16 @@ export const AulaVirtual: React.FC<Props> = ({
           Aula virtual integrada con Moodle
         </p>
       </div>
+
+      {user?.role === 'profesor' &&
+        !loading && !error && secciones.length > 0 && (
+          <CrearAsignacion
+            key={courseId}
+            courseId={courseId}
+            secciones={secciones}
+            onCreated={() => setRevision(n => n + 1)}
+          />
+      )}
 
       {loading && (
         <p className="flex items-center gap-2 text-slate-600">
