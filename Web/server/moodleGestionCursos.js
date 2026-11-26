@@ -1,3 +1,4 @@
+import { createClient } from '@supabase/supabase-js';
 import { activarEstudiante } from './activacionEstudiante.js';
 import { exigirRoles } from './moodleRoles.js';
 
@@ -103,6 +104,124 @@ async function buscarCurso(req, id) {
 }
 
 export function configurarGestionCursos(app) {
+
+    const db = createClient(
+        process.env.SUPABASE_URL,
+        process.env.SUPABASE_SERVICE_ROLE_KEY,
+        {
+            auth: {
+                persistSession: false,
+                autoRefreshToken: false
+            }
+        }
+    );
+
+    app.get(
+        '/api/auth/admin/programas-cursos',
+        exigirRoles('superadmin', 'admin_academico'),
+        async (req, res) => {
+            try {
+                const [programas, asociaciones] = await Promise.all([
+                    db.from('programs')
+                        .select('id,title,is_active')
+                        .order('title'),
+
+                    db.from('iinicia_program_courses')
+                        .select('program_id,moodle_course_id,is_active')
+                ]);
+
+                if (programas.error || asociaciones.error) {
+                    throw new Error('Consulta no disponible');
+                }
+
+                res.json({
+                    success: true,
+                    programas: programas.data,
+                    asociaciones: asociaciones.data
+                });
+
+            } catch {
+                res.status(503).json({
+                    success: false,
+                    error: 'No se pudieron consultar los programas'
+                });
+            }
+        }
+    );
+
+    app.post(
+        '/api/auth/admin/programas-cursos',
+        validarOrigen,
+        exigirRoles('superadmin', 'admin_academico'),
+        async (req, res) => {
+
+            const programaId = String(
+                req.body.programaId || ''
+            ).trim();
+
+            const cursoId = entero(req.body.cursoId);
+
+            if (!programaId || !cursoId || cursoId === 1) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Programa o curso invalido'
+                });
+            }
+
+            try {
+                const curso = await buscarCurso(req, cursoId);
+
+                if (!curso || !tieneAcceso(req, curso.categoryid)) {
+                    return res.status(403).json({
+                        success: false,
+                        error: 'Curso no autorizado'
+                    });
+                }
+
+                const { data: programa, error } = await db
+                    .from('programs')
+                    .select('id')
+                    .eq('id', programaId)
+                    .eq('is_active', true)
+                    .maybeSingle();
+
+                if (error) {
+                    throw new Error('Consulta no disponible');
+                }
+
+                if (!programa) {
+                    return res.status(404).json({
+                        success: false,
+                        error: 'Programa activo no encontrado'
+                    });
+                }
+
+                const resultado = await db
+                    .from('iinicia_program_courses')
+                    .upsert({
+                        program_id: programaId,
+                        moodle_course_id: cursoId,
+                        is_active: true
+                    }, {
+                        onConflict: 'program_id,moodle_course_id'
+                    });
+
+                if (resultado.error) {
+                    throw new Error('Asociacion no guardada');
+                }
+
+                res.json({ success: true });
+
+            } catch {
+                res.status(503).json({
+                    success: false,
+                    error: 'No se pudo asociar el curso'
+                });
+            }
+        }
+    );
+
+
 
     app.get(
         '/api/auth/admin/categorias',
@@ -426,6 +545,20 @@ export function configurarGestionCursos(app) {
                     });
                 }
 
+                try {
+                    await activarEstudiante(usuarioId, cursoId, true);
+                } catch (error) {
+                    console.error(
+                        '[IINICIA Validacion Academica]',
+                        error.message
+                    );
+
+                    return res.status(409).json({
+                        success: false,
+                        error: 'No se pudo autorizar la matricula para el programa academico'
+                    });
+                }
+
                 async function verificar() {
                     const v = await moodle(
                         req,
@@ -470,7 +603,7 @@ export function configurarGestionCursos(app) {
                 let activacion;
 
                 try {
-                    activacion = await activarEstudiante(usuarioId);
+                    activacion = await activarEstudiante(usuarioId, cursoId);
                 } catch (error) {
                     console.error(
                         '[IINICIA Activacion]',

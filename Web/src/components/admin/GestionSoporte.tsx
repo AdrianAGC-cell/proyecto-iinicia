@@ -1,3 +1,5 @@
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
 import React, { useEffect, useState } from 'react';
 
 interface Ticket {
@@ -13,12 +15,15 @@ interface Ticket {
 
 const base = '/api/auth/soporte';
 
-async function api(ruta: string, metodo = 'GET', cuerpo?: object) {
+async function api(ruta: string, metodo = 'GET', cuerpo?: object, token?: string) {
   const respuesta = await fetch(base + ruta, {
     method: metodo,
     credentials: 'include',
     cache: 'no-store',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: 'Bearer ' + token } : {})
+    },
     body: cuerpo ? JSON.stringify(cuerpo) : undefined
   });
 
@@ -35,6 +40,21 @@ export const GestionSoporte: React.FC<{
   administrar?: boolean
 }> = ({ administrar = false }) => {
 
+  const { user } = useAuth();
+
+  async function tokenSolicitante() {
+    if (!user || user.moodleId) return undefined;
+
+    const { data, error } = await supabase.auth.getSession();
+
+    if (error || !data.session ||
+        data.session.user.id !== user.id) {
+      throw new Error('Inicia sesion nuevamente');
+    }
+
+    return data.session.access_token;
+  }
+
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [asunto, setAsunto] = useState('');
   const [descripcion, setDescripcion] = useState('');
@@ -48,7 +68,10 @@ export const GestionSoporte: React.FC<{
   async function cargar() {
     try {
       setError('');
-      const datos = await api(ruta);
+      const datos = await api(
+        ruta, 'GET', undefined,
+        administrar ? undefined : await tokenSolicitante()
+      );
       setTickets(datos.tickets);
     } catch (e: any) {
       setError(e.message);
@@ -58,7 +81,7 @@ export const GestionSoporte: React.FC<{
   useEffect(() => {
     setTickets([]);
     void cargar();
-  }, [administrar]);
+  }, [administrar, user?.id]);
 
   async function crear(e: React.FormEvent) {
     e.preventDefault();
@@ -69,7 +92,7 @@ export const GestionSoporte: React.FC<{
     try {
       await api('/mis-tickets', 'POST', {
         asunto, descripcion, categoria
-      });
+      }, await tokenSolicitante());
 
       setAsunto('');
       setDescripcion('');

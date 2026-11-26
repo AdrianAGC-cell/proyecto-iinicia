@@ -148,6 +148,7 @@ export function configurarAdmisiones(app) {
                     await db.from('programs')
                         .select('id,title')
                         .eq('id', programId)
+                        .eq('is_active', true)
                         .maybeSingle();
 
                 if (errorPrograma) {

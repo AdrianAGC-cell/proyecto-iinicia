@@ -1,3 +1,4 @@
+import { Soporte } from './pages/Soporte';
 import { ProtectedRoute } from './security/ProtectedRoute';
 import { rolesAdministrativos } from './security/roles';
 import React, { useEffect } from 'react';
@@ -59,6 +60,20 @@ export const App: React.FC = () => {
         <AdminPanel />
       </ProtectedRoute>
     } />
+              <Route path="/soporte" element={
+                <ProtectedRoute roles={[
+                  'superadmin',
+                  'admin_tecnico',
+                  'admin_academico',
+                  'coordinador',
+                  'profesor',
+                  'estudiante',
+                  'aspirante',
+                  'soporte'
+                ]}>
+                  <Soporte />
+                </ProtectedRoute>
+              } />
               <Route path="/moodle-preview" element={<MoodlePreview />} />
               <Route path="/recuperar-password" element={<RecuperarPassword />} />
               <Route path="/aviso-privacidad" element={<AvisoPrivacidad />} />

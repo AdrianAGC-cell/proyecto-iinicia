@@ -28,6 +28,55 @@ export function configurarSoporte(app) {
         'soporte'
     );
 
+    async function solicitante(req, res, next) {
+
+        const token = req.get('authorization') || '';
+
+        if (token) {
+
+            if (!token.startsWith('Bearer ')) {
+                return res.status(401).json({
+                    success: false,
+                    error: 'Credencial invalida'
+                });
+            }
+
+            try {
+                const { data, error } = await db.auth.getUser(
+                    token.slice(7)
+                );
+
+                if (error || !data.user ||
+                    !data.user.email_confirmed_at) {
+                    return res.status(401).json({
+                        success: false,
+                        error: 'Cuenta no verificada'
+                    });
+                }
+
+                req.solicitante = {
+                    id: data.user.id,
+                    origen: 'supabase'
+                };
+
+                return next();
+
+            } catch {
+                return fallo(res);
+            }
+        }
+
+        return usuario(req, res, () => {
+
+            req.solicitante = {
+                id: String(req.session.usuario.id),
+                origen: 'moodle'
+            };
+
+            next();
+        });
+    }
+
     const personal = exigirRoles(
         'superadmin',
         'soporte'
@@ -63,13 +112,13 @@ export function configurarSoporte(app) {
         });
     }
 
-    app.get(ruta + '/mis-tickets', usuario, async (req, res) => {
+    app.get(ruta + '/mis-tickets', solicitante, async (req, res) => {
         try {
             const { data, error } = await db
                 .from(tabla)
                 .select('*')
-                .eq('requester_source', 'moodle')
-                .eq('requester_id', String(req.session.usuario.id))
+                .eq('requester_source', req.solicitante.origen)
+                .eq('requester_id', req.solicitante.id)
                 .order('created_at', { ascending: false })
                 .limit(100);
 
@@ -81,7 +130,7 @@ export function configurarSoporte(app) {
         }
     });
 
-    app.post(ruta + '/mis-tickets', origen, usuario, async (req, res) => {
+    app.post(ruta + '/mis-tickets', origen, solicitante, async (req, res) => {
         const { asunto, descripcion, categoria } = req.body || {};
 
         if (
@@ -103,8 +152,8 @@ export function configurarSoporte(app) {
             const { data, error } = await db
                 .from(tabla)
                 .insert({
-                    requester_id: String(req.session.usuario.id),
-                    requester_source: 'moodle',
+                    requester_id: req.solicitante.id,
+                    requester_source: req.solicitante.origen,
                     subject: asunto.trim(),
                     description: descripcion.trim(),
                     category: categoria,

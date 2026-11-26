@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 
-export async function activarEstudiante(usuarioId) {
+export async function activarEstudiante(usuarioId, cursoId, soloValidar = false) {
 
     const db = createClient(
         process.env.SUPABASE_URL,
@@ -40,6 +40,20 @@ export async function activarEstudiante(usuarioId) {
         throw new Error('Perfil institucional no verificable');
     }
 
+    const { data: curso, error: errorCurso } = await db
+        .from('iinicia_program_courses')
+        .select('program_id,moodle_course_id')
+        .eq('program_id', perfil.program_id)
+        .eq('moodle_course_id', cursoId)
+        .eq('is_active', true)
+        .maybeSingle();
+
+    if (errorCurso || !curso) {
+        throw new Error(
+            'El curso no pertenece al programa academico autorizado'
+        );
+    }
+
     const { data: solicitudes, error: errorSolicitud } = await db
         .from('admission_applications')
         .select('id')
@@ -67,6 +81,13 @@ export async function activarEstudiante(usuarioId) {
         perfil.status !== 'pendiente'
     ) {
         throw new Error('Perfil no autorizado para activacion');
+    }
+
+    if (soloValidar) {
+        return {
+            activado: false,
+            autorizado: true
+        };
     }
 
     const { data: actualizado, error: errorActualizacion } = await db

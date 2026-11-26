@@ -1,3 +1,5 @@
+import { GestionProgramas } from '../components/admin/GestionProgramas';
+import { DiagnosticoTecnico } from '../components/admin/DiagnosticoTecnico';
 import { GestionAdmisiones } from '../components/admin/GestionAdmisiones';
 import { GestionSoporte } from '../components/admin/GestionSoporte';
 import { GestionCohortes } from '../components/admin/GestionCohortes';
@@ -193,6 +195,16 @@ export const AdminPanel: React.FC = () => {
           </article>
 
         </section>
+      )}
+
+      {(rol === 'superadmin' ||
+        rol === 'admin_tecnico') && (
+          <DiagnosticoTecnico />
+      )}
+
+      {(rol === 'superadmin' ||
+        rol === 'admin_academico') && (
+          <GestionProgramas />
       )}
 
       {puedeVerCursos && resumen && (
