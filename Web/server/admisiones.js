@@ -1,3 +1,4 @@
+import { vincularAspirante } from './vinculacionMoodle.js';
 import { createClient } from '@supabase/supabase-js';
 import { randomUUID } from 'node:crypto';
 import { exigirRoles } from './moodleRoles.js';
@@ -272,4 +273,34 @@ export function configurarAdmisiones(app) {
             }
         }
     );
+    app.post(
+        base + '/admin/solicitudes/:id/vincular',
+        origen,
+        exigirRoles('superadmin'),
+        async (req, res) => {
+            try {
+                const resultado = await vincularAspirante(
+                    db,
+                    req.params.id,
+                    req.session.moodleToken
+                );
+
+                res.json({
+                    success: true,
+                    ...resultado
+                });
+            } catch (error) {
+                console.error(
+                    'Vinculacion institucional:',
+                    error.message
+                );
+
+                res.status(409).json({
+                    success: false,
+                    error: 'No se completo la vinculacion. Requiere revision administrativa.'
+                });
+            }
+        }
+    );
+
 }

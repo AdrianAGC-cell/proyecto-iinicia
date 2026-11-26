@@ -1,4 +1,5 @@
-import { UserCheck, UserX, ClipboardCheck, X } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { UserCheck, UserX, ClipboardCheck, X, Link2, Loader2 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 
 interface Solicitud {
@@ -18,6 +19,9 @@ interface Solicitud {
 const base = '/api/auth/admisiones/admin/solicitudes';
 
 export const GestionAdmisiones: React.FC = () => {
+  const { user } = useAuth();
+  const puedeVincular = user?.role === 'superadmin';
+
   const [solicitudes, setSolicitudes] = useState<Solicitud[]>([]);
   const [error, setError] = useState('');
   const [mensaje, setMensaje] = useState('');
@@ -70,16 +74,19 @@ export const GestionAdmisiones: React.FC = () => {
   async function cambiarEstado(id: string, estado: string) {
 
 
+    if (ocupado) return;
     setOcupado(true);
     setError('');
     setMensaje('');
 
     try {
-      const respuesta = await fetch(base + '/' + encodeURIComponent(id), {
-        method: 'PATCH',
+      const respuesta = await fetch(
+        base + '/' + encodeURIComponent(id) +
+        (estado === 'VINCULAR' ? '/vincular' : ''), {
+        method: estado === 'VINCULAR' ? 'POST' : 'PATCH',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ estado })
+        body: JSON.stringify(estado === 'VINCULAR' ? {} : { estado })
       });
 
       const datos = await respuesta.json();
@@ -88,7 +95,12 @@ export const GestionAdmisiones: React.FC = () => {
         throw new Error(datos.error || 'No se pudo actualizar');
       }
 
-      setMensaje('Solicitud actualizada correctamente');
+      setMensaje(
+        estado === 'VINCULAR'
+          ? 'Cuenta vinculada correctamente. Matrícula: ' + datos.matricula
+          : 'Solicitud actualizada correctamente'
+      );
+      setConfirmacion(null);
       await cargar();
     } catch (e: any) {
       setError(e.message);
@@ -175,9 +187,22 @@ export const GestionAdmisiones: React.FC = () => {
             )}
 
             {s.status === 'ADMITIDO' && !s.moodle_synced && (
-              <p className="text-sm text-amber-700">
-                Admisión autorizada. Acceso a Moodle pendiente de vinculación.
-              </p>
+              <div className="space-y-3 w-full">
+                <p className="text-sm text-amber-700">
+                  Admisión autorizada. Vinculación con Moodle pendiente.
+                </p>
+
+                {puedeVincular && (
+                  <button
+                    disabled={ocupado}
+                    onClick={() => solicitarConfirmacion(s, 'VINCULAR')}
+                    className="bg-[#22abe2] hover:bg-sky-600 text-white px-4 py-3 rounded-xl font-bold flex items-center gap-2"
+                  >
+                    <Link2 size={18} />
+                    Vincular con Moodle
+                  </button>
+                )}
+              </div>
             )}
           </div>
         </article>
@@ -202,7 +227,9 @@ export const GestionAdmisiones: React.FC = () => {
                   ? 'bg-red-100 text-red-600'
                   : 'bg-sky-100 text-[#22abe2]')
               }>
-                {confirmacion.estado === 'ADMITIDO'
+                {confirmacion.estado === 'VINCULAR'
+                  ? <Link2 size={28} />
+                  : confirmacion.estado === 'ADMITIDO'
                   ? <UserCheck size={28} />
                   : confirmacion.estado === 'RECHAZADO'
                   ? <UserX size={28} />
@@ -221,7 +248,9 @@ export const GestionAdmisiones: React.FC = () => {
 
             <h3 id="titulo-confirmacion"
               className="text-2xl font-black text-slate-900">
-              {confirmacion.estado === 'ADMITIDO'
+              {confirmacion.estado === 'VINCULAR'
+                ? '¿Vincular con Moodle?'
+                : confirmacion.estado === 'ADMITIDO'
                 ? '¿Admitir aspirante?'
                 : confirmacion.estado === 'RECHAZADO'
                 ? '¿Rechazar solicitud?'
@@ -229,7 +258,9 @@ export const GestionAdmisiones: React.FC = () => {
             </h3>
 
             <p className="text-sm text-slate-500 leading-relaxed">
-              {confirmacion.estado === 'ADMITIDO'
+              {confirmacion.estado === 'VINCULAR'
+                ? 'Se creará la cuenta institucional y su vinculación con Moodle. El acceso académico requiere activación y matrícula en cursos.'
+                : confirmacion.estado === 'ADMITIDO'
                 ? 'Se autorizará la admisión del aspirante. El acceso a Moodle requiere una vinculación posterior.'
                 : confirmacion.estado === 'RECHAZADO'
                 ? 'La solicitud quedará registrada como rechazada.'
@@ -248,6 +279,12 @@ export const GestionAdmisiones: React.FC = () => {
               </p>
             </div>
 
+            {error && (
+              <p role="alert" className="bg-red-50 text-red-700 rounded-xl p-3 text-sm">
+                {error}
+              </p>
+            )}
+
             <div className="grid grid-cols-2 gap-3">
               <button
                 disabled={ocupado}
@@ -261,7 +298,6 @@ export const GestionAdmisiones: React.FC = () => {
                 disabled={ocupado}
                 onClick={() => {
                   const actual = confirmacion;
-                  setConfirmacion(null);
                   void cambiarEstado(actual.id, actual.estado);
                 }}
                 className={
@@ -271,7 +307,14 @@ export const GestionAdmisiones: React.FC = () => {
                     : 'bg-[#22abe2] hover:bg-sky-600')
                 }
               >
-                Confirmar
+                {ocupado ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 size={18} className="animate-spin" />
+                    Procesando...
+                  </span>
+                ) : confirmacion.estado === 'VINCULAR'
+                  ? 'Vincular'
+                  : 'Confirmar'}
               </button>
             </div>
           </div>
