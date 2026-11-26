@@ -233,22 +233,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: false, error: msg };
       }
 
-      // Intentar registrar la postulación en admission_applications
-      try {
-        await supabase.from('admission_applications').insert([
-          {
-            id: `SOL-2026-${Math.floor(1000 + Math.random() * 9000)}`,
-            full_name: cleanName,
-            email: cleanEmail,
-            program_id: programId || 'lic-ia-datos',
-            status: 'EN_REVISION',
-            created_at: new Date().toISOString()
-          }
-        ]);
-      } catch (_) {
-        // No bloquear el registro si la tabla tiene RLS o restricciones
-      }
-
       // Si Supabase devolvió sesión inmediatamente (sin confirmación de correo requerida)
       if (data.session && data.user) {
         const fullUser = await buildUserFromSupabase(data.user);

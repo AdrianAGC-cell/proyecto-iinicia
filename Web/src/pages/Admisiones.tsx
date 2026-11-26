@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { 
   CheckCircle2, 
   Send, 
@@ -32,13 +32,12 @@ export const Admisiones: React.FC = () => {
     programId: defaultProg,
     previousSchool: '',
     averageGrade: '',
-    acceptedTerms: true
+    acceptedTerms: false
   });
 
   const [submitting, setSubmitting] = useState(false);
-  const [submittedFolio, setSubmittedFolio] = useState<string | null>(() => {
-    return searchParams.get('folio') || null;
-  });
+  const [submittedFolio, setSubmittedFolio] = useState<string | null>(null);
+  const [errorAdmision, setErrorAdmision] = useState('');
   const [openFaq, setOpenFaq] = useState<number | null>(0);
 
   // Sync user info if user changes or folio in URL
@@ -50,10 +49,7 @@ export const Admisiones: React.FC = () => {
         email: prev.email || user.email || ''
       }));
     }
-    const paramFolio = searchParams.get('folio');
-    if (paramFolio) {
-      setSubmittedFolio(paramFolio);
-    }
+
   }, [user, searchParams]);
 
   // Live Supabase Lookup State
@@ -109,77 +105,79 @@ export const Admisiones: React.FC = () => {
     }
   ];
 
+
+  async function consultarApi(ruta: string, cuerpo?: object) {
+    const { data } = await supabase.auth.getSession();
+
+    if (!data.session?.access_token) {
+      throw new Error('Inicia sesión con tu cuenta de aspirante.');
+    }
+
+    const respuesta = await fetch('/api/auth/admisiones' + ruta, {
+      method: cuerpo ? 'POST' : 'GET',
+      cache: 'no-store',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + data.session.access_token
+      },
+      body: cuerpo ? JSON.stringify(cuerpo) : undefined
+    });
+
+    const resultado = await respuesta.json();
+
+    if (!respuesta.ok || !resultado.success) {
+      throw new Error(resultado.error || 'No se pudo completar la operación');
+    }
+
+    return resultado;
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
-
-    const generatedFolio = `SOL-2026-${Math.floor(1000 + Math.random() * 9000)}`;
-    const prog = MOCK_PROGRAMS.find(p => p.id === formData.programId);
-    const progTitle = prog ? prog.title : 'Programa Académico';
+    setErrorAdmision('');
 
     try {
-      await supabase.from('admission_applications').insert([
-        {
-          id: generatedFolio,
-          full_name: formData.fullName,
-          email: formData.email.trim().toLowerCase(),
-          phone: formData.phone || null,
-          program_id: formData.programId,
-          program_name: progTitle,
-          previous_school: formData.previousSchool || 'Bachillerato General',
-          average_grade: parseFloat(formData.averageGrade) || 9.0,
-          status: 'EN REVISION',
-          moodle_synced: false
-        }
-      ]);
-    } catch (err) {
-      console.warn('Could not insert application into Supabase:', err);
+      const datos = await consultarApi('/solicitudes', formData);
+
+      setFormData(prev => ({
+        ...prev,
+        email: datos.solicitud.email
+      }));
+
+      setSubmittedFolio(datos.solicitud.id);
+    } catch (err: any) {
+      setErrorAdmision(err.message);
+    } finally {
+      setSubmitting(false);
     }
-
-    const savedApps = JSON.parse(localStorage.getItem('iinicia_apps') || '[]');
-    savedApps.unshift({
-      id: generatedFolio,
-      fullName: formData.fullName,
-      email: formData.email,
-      phone: formData.phone,
-      programId: formData.programId,
-      programName: progTitle,
-      previousSchool: formData.previousSchool,
-      averageGrade: formData.averageGrade,
-      status: 'EN REVISION',
-      moodleSynced: false,
-      date: new Date().toISOString().split('T')[0]
-    });
-    localStorage.setItem('iinicia_apps', JSON.stringify(savedApps));
-
-    setSubmittedFolio(generatedFolio);
-    setSubmitting(false);
   };
 
   const handleLookupSupabase = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!lookupQuery.trim()) return;
     setLookupLoading(true);
-    setLookupSearched(true);
+    setLookupSearched(false);
     setLookupResult(null);
+    setErrorAdmision('');
 
     try {
-      const q = lookupQuery.trim();
-      const { data, error } = await supabase
-        .from('admission_applications')
-        .select('*')
-        .or(`id.eq.${q},email.ilike.${q}`)
-        .maybeSingle();
+      const datos = await consultarApi('/mis-solicitudes');
+      const q = lookupQuery.trim().toLowerCase();
 
-      if (data && !error) {
-        setLookupResult(data);
-      }
-    } catch (err) {
-      console.warn('Lookup error:', err);
+      const solicitud = datos.solicitudes.find((item: any) =>
+        String(item.id).toLowerCase() === q ||
+        String(item.email).toLowerCase() === q
+      );
+
+      setLookupResult(solicitud || null);
+      setLookupSearched(true);
+    } catch (err: any) {
+      setErrorAdmision(err.message);
     } finally {
       setLookupLoading(false);
     }
   };
+
 
   return (
     <div className="space-y-20 pb-24">
@@ -249,7 +247,13 @@ export const Admisiones: React.FC = () => {
             </p>
           </div>
 
-          {submittedFolio ? (
+          {errorAdmision && (
+      <p role="alert" className="bg-red-50 text-red-700 border border-red-200 rounded-xl p-4">
+        {errorAdmision}
+      </p>
+    )}
+
+    {submittedFolio ? (
             <div className="bg-[#22abe2]/10 border border-[#22abe2]/30 rounded-3xl p-8 text-center space-y-4 animate-fadeIn">
               <div className="w-16 h-16 rounded-full bg-[#22abe2]/20 text-[#22abe2] flex items-center justify-center mx-auto">
                 <CheckCircle2 className="w-8 h-8" />
@@ -258,7 +262,7 @@ export const Admisiones: React.FC = () => {
                 ¡Solicitud Registrada con Éxito!
               </h3>
               <p className="text-xs text-slate-700">
-                Tu expediente ha sido recibido y se encuentra en estado <strong className="bg-[#22abe2] text-white px-2 py-0.5 rounded">EN REVISIÓN</strong>.
+                Tu expediente ha sido recibido y se encuentra en estado <strong className="bg-[#22abe2] text-white px-2 py-0.5 rounded">PENDIENTE</strong>.
               </p>
               <div className="p-4 bg-white rounded-2xl border border-slate-200 inline-block text-left text-xs font-mono shadow-xs">
                 <p className="text-slate-400">Folio de Aspirante:</p>
@@ -267,7 +271,7 @@ export const Admisiones: React.FC = () => {
                 <p className="text-slate-500">Correo: <span className="text-slate-900 font-semibold">{formData.email || user?.email || ''}</span></p>
               </div>
               <p className="text-xs text-slate-600 max-w-md mx-auto">
-                Un asesor académico evaluará tu promedio ({formData.averageGrade}) y te notificará por correo. También puedes ver esta solicitud reflejada en el Panel de Administración.
+                Un asesor académico evaluará tu promedio ({formData.averageGrade}) Puedes consultar el estado de tu solicitud con el folio generado.
               </p>
               <div className="pt-2 flex justify-center gap-4">
                 <button
@@ -280,19 +284,14 @@ export const Admisiones: React.FC = () => {
                       programId: 'lic-ia-datos',
                       previousSchool: '',
                       averageGrade: '',
-                      acceptedTerms: true
+                      acceptedTerms: false
                     });
                   }}
                   className="px-4 py-2.5 rounded-xl bg-[#22abe2] text-white text-xs font-bold hover:bg-[#1b9ad0] transition shadow-xs cursor-pointer"
                 >
                   Registrar otra solicitud
                 </button>
-                <Link
-                  to="/admin"
-                  className="px-4 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition flex items-center gap-1.5"
-                >
-                  <span>Ver en Panel de Control</span>
-                </Link>
+
               </div>
             </div>
           ) : (
@@ -321,7 +320,7 @@ export const Admisiones: React.FC = () => {
                     required
                     placeholder="ej. mariana.rios@gmail.com"
                     value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    readOnly
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#22abe2] text-xs"
                   />
                 </div>
@@ -392,7 +391,7 @@ export const Admisiones: React.FC = () => {
                 <label className="flex items-start gap-2 text-xs text-slate-600 cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={formData.acceptedTerms}
+                    required checked={formData.acceptedTerms}
                     onChange={(e) => setFormData({ ...formData, acceptedTerms: e.target.checked })}
                     className="mt-0.5 rounded text-[#22abe2] focus:ring-[#22abe2]"
                   />
@@ -404,7 +403,7 @@ export const Admisiones: React.FC = () => {
 
               <button
                 type="submit"
-                disabled={submitting}
+                disabled={submitting || !formData.acceptedTerms}
                 className="w-full py-3.5 px-6 rounded-xl bg-[#22abe2] hover:bg-[#1b9ad0] text-white font-bold text-xs shadow-md shadow-[#22abe2]/20 transition flex items-center justify-center gap-2 cursor-pointer"
               >
                 {submitting ? (

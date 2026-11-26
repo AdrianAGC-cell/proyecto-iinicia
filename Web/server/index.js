@@ -1,3 +1,4 @@
+import { configurarAdmisiones } from './admisiones.js';
 import { configurarSoporte } from './soporte.js';
 import { configurarGestionCursos } from './moodleGestionCursos.js';
 import { configurarAdministracionMoodle } from './moodleAdmin.js';
@@ -462,6 +463,7 @@ configurarAdministracionMoodle(app);
 
 configurarGestionCursos(app);
 configurarSoporte(app);
+configurarAdmisiones(app);
 
 app.listen(PORT, () => {
   console.log(`[IINICIA Backend] API listening on port ${PORT}`);

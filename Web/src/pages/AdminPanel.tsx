@@ -1,3 +1,4 @@
+import { GestionAdmisiones } from '../components/admin/GestionAdmisiones';
 import { GestionSoporte } from '../components/admin/GestionSoporte';
 import { GestionCohortes } from '../components/admin/GestionCohortes';
 import { GestionCursos } from '../components/admin/GestionCursos';
@@ -205,13 +206,7 @@ export const AdminPanel: React.FC = () => {
 
 
       {(rol === 'superadmin' || rol === 'admin_academico') && (
-        <section className="bg-white border rounded-2xl p-6">
-          <Users className="text-sky-600 mb-3" />
-          <h2 className="font-bold">Gestión de admisiones</h2>
-          <p className="text-sm text-slate-500 mt-2">
-            Integración de solicitudes y matrículas pendiente.
-          </p>
-        </section>
+        <GestionAdmisiones />
       )}
 
       {(rol === 'soporte' || rol === 'superadmin') && (
