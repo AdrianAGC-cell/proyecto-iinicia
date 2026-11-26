@@ -435,18 +435,20 @@ export function configurarGestionCursos(app) {
                     }
                 );
 
-                const participantes = await moodle(
+                const verificacion = await moodle(
                     req,
-                    'core_enrol_get_enrolled_users',
-                    { courseid: cursoId }
+                    'local_iinicia_enrolment_status',
+                    {
+                        courseid: cursoId,
+                        userid: usuarioId
+                    }
                 );
 
-                const matriculado = participantes.some(u =>
-                    Number(u.id) === usuarioId &&
-                    (u.roles || []).some(r =>
-                        r.shortname === 'student'
-                    )
-                );
+                const matriculado =
+                    Number(verificacion.courseid) === cursoId &&
+                    Number(verificacion.userid) === usuarioId &&
+                    verificacion.enrolled === true &&
+                    verificacion.student === true;
 
                 if (!matriculado) {
                     throw new Error('Matricula no confirmada');

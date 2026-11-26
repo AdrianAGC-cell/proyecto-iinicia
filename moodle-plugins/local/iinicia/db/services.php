@@ -63,3 +63,14 @@ $functions['local_iinicia_user_roles'] = [
     'type' => 'read',
     'services' => [MOODLE_OFFICIAL_MOBILE_SERVICE]
 ];
+
+
+$functions['local_iinicia_enrolment_status'] = [
+    'classname' => 'local_iinicia\\external\\enrolment_status',
+    'methodname' => 'execute',
+    'description' => 'Verificar matricula academica activa',
+    'type' => 'read',
+    'ajax' => false,
+    'capabilities' => 'enrol/manual:enrol',
+    'services' => [MOODLE_OFFICIAL_MOBILE_SERVICE]
+];
