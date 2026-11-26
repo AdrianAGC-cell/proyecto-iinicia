@@ -92,7 +92,7 @@ async function ejecutarVinculacion(db, folio, token) {
 
     const identificador = owner.replaceAll('-', '');
     const username = 'iinicia_' + identificador;
-    const matricula = 'IIN-' + identificador.toUpperCase();
+    const matricula = 'IIN-' + identificador.slice(0, 16).toUpperCase();
 
     const { data: perfil, error: errorPerfil } = await db
         .from('users')
@@ -224,7 +224,7 @@ async function ejecutarVinculacion(db, folio, token) {
             email: solicitud.email,
             full_name: solicitud.full_name,
             phone: solicitud.phone,
-            role_id: 'estudiante',
+            role_id: 'aspirante',
             status: 'pendiente',
             matricula,
             program_id: solicitud.program_id,
