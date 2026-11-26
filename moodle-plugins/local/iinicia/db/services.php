@@ -74,3 +74,34 @@ $functions['local_iinicia_enrolment_status'] = [
     'capabilities' => 'enrol/manual:enrol',
     'services' => [MOODLE_OFFICIAL_MOBILE_SERVICE]
 ];
+
+
+$functions['local_iinicia_create_assignment'] = [
+    'classname' => 'local_iinicia\external\create_assignment',
+    'methodname' => 'execute',
+    'description' => 'Crear asignaciones individuales IINICIA',
+    'type' => 'write',
+    'ajax' => false,
+    'capabilities' => 'moodle/course:manageactivities,mod/assign:addinstance',
+    'services' => [MOODLE_OFFICIAL_MOBILE_SERVICE]
+];
+
+
+$functions['local_iinicia_manage_visibility'] = [
+    'classname' => 'local_iinicia\external\manage_visibility',
+    'methodname' => 'execute',
+    'description' => 'Gestion docente IINICIA: manage_visibility',
+    'type' => 'write',
+    'ajax' => false,
+    'services' => [MOODLE_OFFICIAL_MOBILE_SERVICE]
+];
+
+
+$functions['local_iinicia_course_permissions'] = [
+    'classname' => 'local_iinicia\external\course_permissions',
+    'methodname' => 'execute',
+    'description' => 'Gestion docente IINICIA: course_permissions',
+    'type' => 'read',
+    'ajax' => false,
+    'services' => [MOODLE_OFFICIAL_MOBILE_SERVICE]
+];

@@ -127,6 +127,19 @@ export function configurarCursosMoodle(app) {
         throw new Error('Respuesta inesperada de Moodle');
       }
 
+      const permisos = await consultarMoodle(
+        req.session.moodleToken,
+        'local_iinicia_course_permissions',
+        { courseid: String(courseId) }
+      );
+
+      if (Number(permisos.courseid) !== courseId) {
+        throw new Error('Permisos de curso invalidos');
+      }
+
+      const puedeVerOcultas =
+        permisos.canviewhidden === true;
+
       const secciones = data
         .filter(s => s.visible !== 0 && s.uservisible !== false)
         .map(seccion => ({
@@ -136,7 +149,11 @@ export function configurarCursosMoodle(app) {
           resumen: seccion.summary || '',
           visible: seccion.visible,
           actividades: (seccion.modules || [])
-            .filter(m => m.visible !== 0 && m.uservisible !== false)
+            .filter(m =>
+              (m.visible !== 0 && m.uservisible !== false) ||
+              (puedeVerOcultas && m.modname === 'assign' &&
+                m.visible === 0 && m.uservisible === true)
+            )
             .map(actividad => ({
               id: actividad.id,
               nombre: actividad.name,
@@ -155,6 +172,13 @@ export function configurarCursosMoodle(app) {
       return res.json({
         conectado: true,
         cursoId: courseId,
+        permisos: {
+          puedeCrear: permisos.cancreate === true,
+          puedeGestionar: permisos.canmanage === true,
+          puedeCambiarVisibilidad:
+            permisos.canvisibility === true &&
+            permisos.canviewhidden === true
+        },
         totalSecciones: secciones.length,
         secciones
       });

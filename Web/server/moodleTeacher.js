@@ -35,6 +35,80 @@ export function configurarProfesorMoodle(app) {
 
 
 
+
+  app.patch(
+    '/api/auth/teacher/courses/:courseId/modules/:cmid/visibility',
+    async (req, res) => {
+      res.set('Cache-Control', 'no-store');
+
+      const rechazar = (status, error) =>
+        res.status(status).json({ success: false, error });
+
+      if (!req.session?.usuario || !req.session?.moodleToken) {
+        return rechazar(401, 'Sesion no activa');
+      }
+
+      const origenes = (
+        process.env.WEB_ORIGINS || 'http://localhost:5173'
+      ).split(',').map(x => x.trim());
+
+      if (!origenes.includes(req.get('origin')) ||
+          !req.is('application/json')) {
+        return rechazar(403, 'Solicitud no permitida');
+      }
+
+      const courseId = Number(req.params.courseId);
+      const cmid = Number(req.params.cmid);
+      const visible = req.body?.visible;
+
+      if (!Number.isSafeInteger(courseId) || courseId <= 1 ||
+          !Number.isSafeInteger(cmid) || cmid <= 0 ||
+          typeof visible !== 'boolean') {
+        return rechazar(400, 'Datos invalidos');
+      }
+
+      try {
+        const datos = await consultar(
+          req.session.moodleToken,
+          'local_iinicia_manage_visibility',
+          {
+            courseid: String(courseId),
+            cmid: String(cmid),
+            visible: visible ? '1' : '0'
+          }
+        );
+
+        if (datos.success !== true ||
+            Number(datos.cmid) !== cmid ||
+            datos.visible !== visible) {
+          throw new Error('Respuesta inesperada');
+        }
+
+        return res.json({
+          success: true,
+          moduloId: cmid,
+          visible
+        });
+
+      } catch (error) {
+        if ([
+          'nopermissions',
+          'requireloginerror',
+          'accessexception',
+          'webservice_access_exception'
+        ].includes(error.moodleCode)) {
+          return rechazar(403, 'No tienes permiso para modificar esta actividad');
+        }
+
+        if (error.moodleCode === 'invalidparameter') {
+          return rechazar(400, 'Actividad invalida');
+        }
+
+        return rechazar(502, 'Moodle no pudo confirmar el cambio');
+      }
+    }
+  );
+
   app.post(
     '/api/auth/teacher/courses/:courseId/assignments',
     async (req, res) => {

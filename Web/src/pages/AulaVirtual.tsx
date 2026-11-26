@@ -1,4 +1,4 @@
-import { useAuth } from '../context/AuthContext';
+import { ConfirmacionModal } from '../components/common/ConfirmacionModal';
 import { CrearAsignacion } from '../components/moodle/CrearAsignacion';
 import React, { useEffect, useState } from 'react';
 import { ArrowLeft, BookOpen, FileText, Loader2 } from 'lucide-react';
@@ -11,6 +11,7 @@ type Actividad = {
   nombre: string;
   tipo: string;
   descripcion?: string;
+  visible?: number;
   contents?: Array<{
     filename: string;
     mimetype: string;
@@ -35,7 +36,62 @@ export const AulaVirtual: React.FC<Props> = ({
   courseName,
   onBack
 }) => {
-  const { user } = useAuth();
+  const [permisos, setPermisos] = useState({
+    puedeCrear: false,
+    puedeCambiarVisibilidad: false
+  });
+
+  const [cambiando, setCambiando] = useState<number | null>(null);
+  const [mensajeGestion, setMensajeGestion] = useState('');
+
+  const [confirmacion, setConfirmacion] = useState<{
+    cmid: number;
+    visible: boolean;
+  } | null>(null);
+
+  const cambiarVisibilidad = async (
+    cmid: number,
+    visible: boolean
+  ) => {
+    if (cambiando !== null) return;
+
+    setConfirmacion(null);
+
+    setCambiando(cmid);
+    setMensajeGestion('');
+
+    try {
+      const respuesta = await fetch(
+        `/api/auth/teacher/courses/${courseId}/modules/${cmid}/visibility`,
+        {
+          method: 'PATCH',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ visible })
+        }
+      );
+
+      const datos = await respuesta.json();
+
+      if (!respuesta.ok || datos.success !== true) {
+        throw new Error(datos.error || 'No se pudo confirmar el cambio');
+      }
+
+      setMensajeGestion(
+        visible ? 'Asignación mostrada.' : 'Asignación ocultada.'
+      );
+
+    } catch (error) {
+      setMensajeGestion(
+        error instanceof Error
+          ? error.message
+          : 'No se pudo confirmar el cambio.'
+      );
+    } finally {
+      setCambiando(null);
+      setRevision(n => n + 1);
+    }
+  };
   const [revision, setRevision] = useState(0);
 
   const [secciones, setSecciones] = useState<Seccion[]>([]);
@@ -50,6 +106,10 @@ export const AulaVirtual: React.FC<Props> = ({
     const cargar = async () => {
       setLoading(true);
       setError('');
+      setPermisos({
+        puedeCrear: false,
+        puedeCambiarVisibilidad: false
+      });
       setSecciones([]);
       setTareas([]);
       setErrorTareas('');
@@ -78,6 +138,12 @@ export const AulaVirtual: React.FC<Props> = ({
         if (!data.conectado || !Array.isArray(data.secciones)) {
           throw new Error('Respuesta inesperada del servidor.');
         }
+
+        setPermisos({
+          puedeCrear: data.permisos?.puedeCrear === true,
+          puedeCambiarVisibilidad:
+            data.permisos?.puedeCambiarVisibilidad === true
+        });
 
         setSecciones(data.secciones);
 
@@ -125,6 +191,25 @@ export const AulaVirtual: React.FC<Props> = ({
 
   return (
     <div className="space-y-6">
+      {confirmacion && (
+        <ConfirmacionModal
+          titulo={confirmacion.visible
+            ? 'Mostrar asignación'
+            : 'Ocultar asignación'}
+          mensaje={confirmacion.visible
+            ? 'Los estudiantes podrán consultar esta asignación según su disponibilidad.'
+            : 'Los estudiantes dejarán de ver esta asignación temporalmente.'}
+          detalle="Las entregas y calificaciones existentes se conservarán."
+          textoConfirmar={confirmacion.visible
+            ? 'Mostrar asignación'
+            : 'Ocultar asignación'}
+          onCancelar={() => setConfirmacion(null)}
+          onConfirmar={() => cambiarVisibilidad(
+            confirmacion.cmid,
+            confirmacion.visible
+          )}
+        />
+      )}
       <button
         type="button"
         onClick={onBack}
@@ -144,7 +229,7 @@ export const AulaVirtual: React.FC<Props> = ({
         </p>
       </div>
 
-      {user?.role === 'profesor' &&
+      {permisos.puedeCrear &&
         !loading && !error && secciones.length > 0 && (
           <CrearAsignacion
             key={courseId}
@@ -152,6 +237,13 @@ export const AulaVirtual: React.FC<Props> = ({
             secciones={secciones}
             onCreated={() => setRevision(n => n + 1)}
           />
+      )}
+
+      {mensajeGestion && (
+        <div role="status"
+          className="bg-slate-100 rounded-xl p-4 text-sm">
+          {mensajeGestion}
+        </div>
       )}
 
       {loading && (
@@ -220,6 +312,33 @@ export const AulaVirtual: React.FC<Props> = ({
                     </p>
                   </div>
                 </div>
+
+                {actividad.tipo === 'assign' &&
+                  permisos.puedeCambiarVisibilidad && (
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <span className="text-xs font-bold text-slate-600">
+                        {actividad.visible === 0
+                          ? 'Oculta para estudiantes'
+                          : 'Visible'}
+                      </span>
+
+                      <button
+                        type="button"
+                        disabled={cambiando !== null}
+                        onClick={() => setConfirmacion({
+                          cmid: actividad.id,
+                          visible: actividad.visible === 0
+                        })}
+                        className="px-4 py-2 rounded-xl border border-slate-300 text-xs font-bold disabled:opacity-50"
+                      >
+                        {cambiando === actividad.id
+                          ? 'Guardando...'
+                          : actividad.visible === 0
+                            ? 'Mostrar asignación'
+                            : 'Ocultar asignación'}
+                      </button>
+                    </div>
+                )}
 
                 {actividad.tipo === 'assign' && tarea && (
                   <ActividadMoodle
