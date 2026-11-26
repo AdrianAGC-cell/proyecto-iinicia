@@ -138,6 +138,76 @@ export function configurarGestionCursos(app) {
         }
     );
 
+    app.get(
+        '/api/auth/admin/cursos',
+        exigirRoles(...academicos),
+        async (req, res) => {
+            try {
+                const categorias = await moodle(
+                    req,
+                    'core_course_get_categories'
+                );
+
+                if (!Array.isArray(categorias)) {
+                    throw new Error('Categorias invalidas');
+                }
+
+                const permitidas = categorias.filter(
+                    c => tieneAcceso(req, c.id)
+                );
+
+                const resultados = await Promise.all(
+                    permitidas.map(async categoria => {
+                        const datos = await moodle(
+                            req,
+                            'core_course_get_courses_by_field',
+                            {
+                                field: 'category',
+                                value: String(categoria.id)
+                            }
+                        );
+
+                        if (!Array.isArray(datos?.courses)) {
+                            throw new Error('Cursos invalidos');
+                        }
+
+                        return datos.courses
+                            .filter(c =>
+                                Number(c.id) !== 1 &&
+                                Number(c.categoryid) === Number(categoria.id) &&
+                                tieneAcceso(req, c.categoryid)
+                            )
+                            .map(c => ({
+                                id: c.id,
+                                nombre: c.fullname,
+                                nombreCorto: c.shortname,
+                                categoria: c.categoryid,
+                                categoriaId: c.categoryid,
+                                categoriaNombre: categoria.name,
+                                visible: Number(c.visible) === 1
+                            }));
+                    })
+                );
+
+                res.json({
+                    success: true,
+                    cursos: resultados.flat()
+                });
+
+            } catch (error) {
+                console.error(
+                    '[IINICIA Listar Cursos]',
+                    error.message
+                );
+
+                res.status(503).json({
+                    success: false,
+                    error: 'No se pudieron consultar los cursos'
+                });
+            }
+        }
+    );
+
     app.post(
         '/api/auth/admin/cursos',
         validarOrigen,
