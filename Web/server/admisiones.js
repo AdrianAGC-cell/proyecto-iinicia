@@ -145,11 +145,14 @@ export function configurarAdmisiones(app) {
 
                 const { data: programa, error: errorPrograma } =
                     await db.from('programs')
-                        .select('id')
+                        .select('id,title')
                         .eq('id', programId)
                         .maybeSingle();
 
-                if (errorPrograma) return fallo(res);
+                if (errorPrograma) {
+        console.error('Error programa:', errorPrograma.code);
+        return fallo(res);
+    }
 
                 if (!programa) {
                     return res.status(400).json({
@@ -169,6 +172,7 @@ export function configurarAdmisiones(app) {
                         email: req.aspirante.email,
                         phone: phone.trim() || null,
                         program_id: programa.id,
+                        program_name: programa.title,
                         previous_school: previousSchool.trim(),
                         average_grade: promedio,
                         status: 'PENDIENTE',
@@ -184,7 +188,10 @@ export function configurarAdmisiones(app) {
                             error: 'Ya existe una solicitud para este programa'
                         });
                     }
-                    console.error('Error admisiones:', error.code);
+                    console.error('Error admisiones:', {
+        codigo: error.code,
+        mensaje: error.message
+    });
                     return fallo(res);
                 }
 
