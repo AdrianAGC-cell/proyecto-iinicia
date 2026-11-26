@@ -429,7 +429,7 @@ class IiniciaRepository(context: Context) {
 
             val respuesta = supabaseApi.recuperarSupabase(
                 SupabaseClient.SUPABASE_KEY,
-                "https://web-kappa-one-49.vercel.app/recuperar-password",
+                "https://iinicia-web-final.vercel.app/recuperar-password",
                 cuerpo
             )
 

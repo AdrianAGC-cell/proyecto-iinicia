@@ -27,7 +27,8 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const origenesPermitidos = new Set([
   'http://localhost:5173',
-  'https://web-kappa-one-49.vercel.app'
+  'https://web-kappa-one-49.vercel.app',
+  'https://iinicia-web-final.vercel.app'
 ]);
 
 app.disable('x-powered-by');
