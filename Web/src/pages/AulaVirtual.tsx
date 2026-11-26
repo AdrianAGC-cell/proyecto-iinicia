@@ -1,3 +1,4 @@
+import { EditarAsignacion } from '../components/moodle/EditarAsignacion';
 import { ConfirmacionModal } from '../components/common/ConfirmacionModal';
 import { CrearAsignacion } from '../components/moodle/CrearAsignacion';
 import React, { useEffect, useState } from 'react';
@@ -43,6 +44,7 @@ export const AulaVirtual: React.FC<Props> = ({
 
   const [cambiando, setCambiando] = useState<number | null>(null);
   const [mensajeGestion, setMensajeGestion] = useState('');
+  const [editando, setEditando] = useState<number | null>(null);
 
   const [confirmacion, setConfirmacion] = useState<{
     cmid: number;
@@ -191,6 +193,18 @@ export const AulaVirtual: React.FC<Props> = ({
 
   return (
     <div className="space-y-6">
+      {editando !== null && (
+        <EditarAsignacion
+          courseId={Number(courseId)}
+          cmid={editando}
+          onClose={() => setEditando(null)}
+          onSaved={() => {
+            setEditando(null);
+            setMensajeGestion('Asignación actualizada correctamente.');
+            setRevision(n => n + 1);
+          }}
+        />
+      )}
       {confirmacion && (
         <ConfirmacionModal
           titulo={confirmacion.visible
@@ -322,6 +336,13 @@ export const AulaVirtual: React.FC<Props> = ({
                           : 'Visible'}
                       </span>
 
+                      <button
+                        type="button"
+                        onClick={() => setEditando(actividad.id)}
+                        className="px-3 py-2 rounded-xl border border-sky-200 text-[#148ebf] text-xs font-bold hover:bg-sky-50"
+                      >
+                        Editar asignación
+                      </button>
                       <button
                         type="button"
                         disabled={cambiando !== null}

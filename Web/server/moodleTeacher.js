@@ -27,6 +27,13 @@ export function configurarProfesorMoodle(app) {
     if (datos?.exception) {
       const error = new Error(datos.message || 'Moodle rechazo la operacion');
       error.moodleCode = datos.errorcode;
+      console.error('ERROR MOODLE:', {
+        funcion,
+        codigo: datos.errorcode,
+        mensaje: datos.message,
+        detalle: datos.debuginfo
+      });
+
       throw error;
     }
 
@@ -35,6 +42,111 @@ export function configurarProfesorMoodle(app) {
 
 
 
+
+
+  const rutaEdicion =
+    '/api/auth/teacher/courses/:courseId/modules/:cmid/settings';
+
+  async function gestionarEdicion(req, res) {
+    res.set('Cache-Control', 'no-store');
+
+    const rechazar = (status, error) =>
+      res.status(status).json({ success: false, error });
+
+    if (!req.session?.usuario || !req.session?.moodleToken) {
+      return rechazar(401, 'Sesion no activa');
+    }
+
+    const courseId = Number(req.params.courseId);
+    const cmid = Number(req.params.cmid);
+
+    if (!Number.isSafeInteger(courseId) || courseId <= 1 ||
+        !Number.isSafeInteger(cmid) || cmid <= 0) {
+      return rechazar(400, 'Actividad invalida');
+    }
+
+    const parametros = {
+      courseid: String(courseId),
+      cmid: String(cmid)
+    };
+
+    const editar = req.method === 'PATCH';
+
+    if (editar) {
+      const origenes = (
+        process.env.WEB_ORIGINS || 'http://localhost:5173'
+      ).split(',').map(x => x.trim());
+
+      if (!origenes.includes(req.get('origin')) ||
+          !req.is('application/json')) {
+        return rechazar(403, 'Solicitud no permitida');
+      }
+
+      const {
+        name, description, availablefrom,
+        duedate, cutoffdate, modified
+      } = req.body || {};
+
+      if (typeof name !== 'string' ||
+          !name.trim() || name.length > 200 ||
+          typeof description !== 'string' ||
+          description.length > 10000 ||
+          ![availablefrom, duedate, cutoffdate, modified]
+            .every(x => Number.isSafeInteger(x) && x >= 0)) {
+        return rechazar(400, 'Revisa los datos de la asignacion');
+      }
+
+      Object.assign(parametros, {
+        name: name.trim(),
+        description,
+        availablefrom: String(availablefrom),
+        duedate: String(duedate),
+        cutoffdate: String(cutoffdate),
+        modified: String(modified)
+      });
+    }
+
+    try {
+      const datos = await consultar(
+        req.session.moodleToken,
+        editar
+          ? 'local_iinicia_update_assignment'
+          : 'local_iinicia_assignment_settings',
+        parametros
+      );
+
+      if (datos.success !== true ||
+          Number(datos.cmid) !== cmid ||
+          (!editar && Number(datos.courseid) !== courseId)) {
+        throw new Error('Respuesta inesperada');
+      }
+
+      return res.json(datos);
+
+    } catch (error) {
+      if ([
+        'nopermissions',
+        'requireloginerror',
+        'accessexception',
+        'webservice_access_exception'
+      ].includes(error.moodleCode)) {
+        return rechazar(403, 'No tienes permiso para editar esta actividad');
+      }
+
+      if (error.moodleCode === 'invalidparameter') {
+        console.error('Detalle de edicion Moodle:', error.message);
+
+        return rechazar(400, error.message);
+      }
+
+      console.error('Edicion docente:', error.moodleCode || 'error');
+
+      return rechazar(502, 'Moodle no pudo confirmar la operacion');
+    }
+  }
+
+  app.get(rutaEdicion, gestionarEdicion);
+  app.patch(rutaEdicion, gestionarEdicion);
 
   app.patch(
     '/api/auth/teacher/courses/:courseId/modules/:cmid/visibility',
