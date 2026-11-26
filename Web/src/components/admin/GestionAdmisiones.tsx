@@ -1,3 +1,4 @@
+import { UserCheck, UserX, ClipboardCheck, X } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 
 interface Solicitud {
@@ -21,6 +22,21 @@ export const GestionAdmisiones: React.FC = () => {
   const [error, setError] = useState('');
   const [mensaje, setMensaje] = useState('');
   const [ocupado, setOcupado] = useState(false);
+
+  const [confirmacion, setConfirmacion] = useState<{
+    id: string;
+    estado: string;
+    nombre: string;
+  } | null>(null);
+
+  function solicitarConfirmacion(solicitud: Solicitud, estado: string) {
+    setConfirmacion({
+      id: solicitud.id,
+      estado,
+      nombre: solicitud.full_name
+    });
+  }
+
   const [cargando, setCargando] = useState(true);
 
   async function cargar() {
@@ -52,9 +68,7 @@ export const GestionAdmisiones: React.FC = () => {
   }, []);
 
   async function cambiarEstado(id: string, estado: string) {
-    if (!window.confirm('¿Confirmar cambio a ' + estado + '?')) {
-      return;
-    }
+
 
     setOcupado(true);
     setError('');
@@ -138,7 +152,7 @@ export const GestionAdmisiones: React.FC = () => {
           <div className="flex flex-wrap gap-2">
             {s.status === 'PENDIENTE' && (
               <button disabled={ocupado}
-                onClick={() => cambiarEstado(s.id, 'EN REVISION')}
+                onClick={() => solicitarConfirmacion(s, 'EN REVISION')}
                 className="bg-sky-600 text-white px-4 py-2 rounded-lg">
                 Revisar solicitud
               </button>
@@ -147,13 +161,13 @@ export const GestionAdmisiones: React.FC = () => {
             {s.status === 'EN REVISION' && (
               <>
                 <button disabled={ocupado}
-                  onClick={() => cambiarEstado(s.id, 'ADMITIDO')}
+                  onClick={() => solicitarConfirmacion(s, 'ADMITIDO')}
                   className="bg-green-600 text-white px-4 py-2 rounded-lg">
                   Admitir aspirante
                 </button>
 
                 <button disabled={ocupado}
-                  onClick={() => cambiarEstado(s.id, 'RECHAZADO')}
+                  onClick={() => solicitarConfirmacion(s, 'RECHAZADO')}
                   className="bg-red-600 text-white px-4 py-2 rounded-lg">
                   Rechazar solicitud
                 </button>
@@ -168,6 +182,102 @@ export const GestionAdmisiones: React.FC = () => {
           </div>
         </article>
       ))}
+
+      {confirmacion && (
+        <div
+          className="fixed inset-0 z-[9999] bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => !ocupado && setConfirmacion(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="titulo-confirmacion"
+            className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-7 space-y-5"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between">
+              <div className={
+                'w-14 h-14 rounded-2xl flex items-center justify-center ' +
+                (confirmacion.estado === 'RECHAZADO'
+                  ? 'bg-red-100 text-red-600'
+                  : 'bg-sky-100 text-[#22abe2]')
+              }>
+                {confirmacion.estado === 'ADMITIDO'
+                  ? <UserCheck size={28} />
+                  : confirmacion.estado === 'RECHAZADO'
+                  ? <UserX size={28} />
+                  : <ClipboardCheck size={28} />}
+              </div>
+
+              <button
+                aria-label="Cerrar"
+                disabled={ocupado}
+                onClick={() => setConfirmacion(null)}
+                className="text-slate-400 hover:text-slate-700 p-2"
+              >
+                <X size={22} />
+              </button>
+            </div>
+
+            <h3 id="titulo-confirmacion"
+              className="text-2xl font-black text-slate-900">
+              {confirmacion.estado === 'ADMITIDO'
+                ? '¿Admitir aspirante?'
+                : confirmacion.estado === 'RECHAZADO'
+                ? '¿Rechazar solicitud?'
+                : '¿Revisar solicitud?'}
+            </h3>
+
+            <p className="text-sm text-slate-500 leading-relaxed">
+              {confirmacion.estado === 'ADMITIDO'
+                ? 'Se autorizará la admisión del aspirante. El acceso a Moodle requiere una vinculación posterior.'
+                : confirmacion.estado === 'RECHAZADO'
+                ? 'La solicitud quedará registrada como rechazada.'
+                : 'La solicitud pasará al proceso de revisión académica.'}
+            </p>
+
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+              <p className="text-xs text-slate-500 uppercase font-bold">
+                Aspirante
+              </p>
+              <p className="font-bold text-slate-900">
+                {confirmacion.nombre}
+              </p>
+              <p className="text-xs text-slate-500 break-all mt-1">
+                {confirmacion.id}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                disabled={ocupado}
+                onClick={() => setConfirmacion(null)}
+                className="border border-slate-200 rounded-xl py-3 font-bold text-slate-600 hover:bg-slate-50"
+              >
+                Cancelar
+              </button>
+
+              <button
+                disabled={ocupado}
+                onClick={() => {
+                  const actual = confirmacion;
+                  setConfirmacion(null);
+                  void cambiarEstado(actual.id, actual.estado);
+                }}
+                className={
+                  'rounded-xl py-3 font-bold text-white transition-colors ' +
+                  (confirmacion.estado === 'RECHAZADO'
+                    ? 'bg-red-600 hover:bg-red-700'
+                    : 'bg-[#22abe2] hover:bg-sky-600')
+                }
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </section>
   );
 };
