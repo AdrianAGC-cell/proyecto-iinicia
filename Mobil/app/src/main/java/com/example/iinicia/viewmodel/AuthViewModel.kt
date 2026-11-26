@@ -37,17 +37,104 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+
     fun loginWithGoogle() {
-        _authState.value = AuthState.Error(
-            "El acceso con Google requiere autenticacion real."
-        )
+        if (_authState.value is AuthState.Loading) return
+
+        try {
+            _authState.value = AuthState.Idle
+
+            com.example.iinicia.data.GoogleOAuth.iniciar(
+                getApplication<Application>()
+            )
+
+        } catch (e: Exception) {
+            _authState.value = AuthState.Error(
+                "No se pudo abrir el acceso con Google"
+            )
+        }
+    }
+
+    fun completarGoogle(uri: android.net.Uri) {
+
+        val verifier =
+            com.example.iinicia.data.GoogleOAuth.consumirVerifier()
+                ?: return
+
+        val codigo = uri.getQueryParameter("code")
+
+        if (codigo.isNullOrBlank()) {
+            _authState.value = AuthState.Error(
+                "Acceso con Google cancelado o no autorizado"
+            )
+            return
+        }
+
+        viewModelScope.launch {
+            _authState.value = AuthState.Loading
+
+            repository.completarGoogle(codigo, verifier)
+                .onSuccess {
+                    _authState.value = AuthState.Success(it.user)
+                }
+                .onFailure {
+                    _authState.value = AuthState.Error(
+                        it.message ?: "Error de autenticacion Google"
+                    )
+                }
+        }
+    }
+
+
+
+    private val _mensajeCuenta = MutableStateFlow("")
+    val mensajeCuenta: StateFlow<String> =
+        _mensajeCuenta.asStateFlow()
+
+    fun limpiarMensajeCuenta() {
+        _mensajeCuenta.value = ""
     }
 
     fun register(name: String, email: String, pass: String) {
-        _authState.value = AuthState.Error(
-            "Por el momento realiza tu registro desde el portal web."
-        )
+        if (_authState.value is AuthState.Loading) return
+
+        viewModelScope.launch {
+            _authState.value = AuthState.Loading
+
+            repository.registrarAspirante(name, email, pass)
+                .onSuccess {
+                    _authState.value = AuthState.Idle
+                    _mensajeCuenta.value =
+                        "Solicitud de registro procesada. Revisa tu correo para confirmar la cuenta."
+                }
+                .onFailure {
+                    _authState.value = AuthState.Error(
+                        it.message ?: "No se pudo registrar"
+                    )
+                }
+        }
     }
+
+    fun recuperarPassword(email: String) {
+        if (_authState.value is AuthState.Loading) return
+
+        viewModelScope.launch {
+            _authState.value = AuthState.Loading
+
+            repository.recuperarCuenta(email)
+                .onSuccess {
+                    _authState.value = AuthState.Idle
+                    _mensajeCuenta.value =
+                        "Si existe una cuenta asociada, recibiras instrucciones de recuperacion."
+                }
+                .onFailure {
+                    _authState.value = AuthState.Error(
+                        it.message ?: "No se pudo recuperar la cuenta"
+                    )
+                }
+        }
+    }
+
 
     fun logout() {
         viewModelScope.launch {

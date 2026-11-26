@@ -9,6 +9,55 @@ import retrofit2.http.Path
 import retrofit2.http.Query
 
 interface IiniciaApi {
+    @POST("api/auth/institucional")
+    suspend fun autenticarInstitucional(
+        @Header("Authorization") authorization: String
+    ): Response<com.google.gson.JsonObject>
+
+
+    @GET("rest/v1/programs")
+    suspend fun programasAdmisiones(
+        @Header("apikey") apiKey: String,
+        @Header("Authorization") authorization: String,
+        @Query("select") campos: String = "id,title",
+        @Query("is_active") activos: String = "eq.true",
+        @Query("order") orden: String = "title.asc"
+    ): Response<com.google.gson.JsonArray>
+
+
+    @POST("auth/v1/token")
+    suspend fun autenticarSupabase(
+        @Header("apikey") apiKey: String,
+        @Query("grant_type") grantType: String,
+        @Body datos: com.google.gson.JsonObject
+    ): Response<com.google.gson.JsonObject>
+
+    @GET("auth/v1/user")
+    suspend fun identidadSupabase(
+        @Header("apikey") apiKey: String,
+        @Header("Authorization") authorization: String
+    ): Response<com.google.gson.JsonObject>
+
+    @POST("auth/v1/signup")
+    suspend fun registrarSupabase(
+        @Header("apikey") apiKey: String,
+        @Body datos: com.google.gson.JsonObject
+    ): Response<com.google.gson.JsonObject>
+
+    @POST("auth/v1/recover")
+    suspend fun recuperarSupabase(
+        @Header("apikey") apiKey: String,
+        @Query("redirect_to") redirectTo: String,
+        @Body datos: com.google.gson.JsonObject
+    ): Response<com.google.gson.JsonObject>
+
+    @POST("auth/v1/logout")
+    suspend fun cerrarSupabase(
+        @Header("apikey") apiKey: String,
+        @Header("Authorization") authorization: String
+    ): Response<okhttp3.ResponseBody>
+
+
     @retrofit2.http.Streaming
     @GET
     suspend fun downloadManagement(

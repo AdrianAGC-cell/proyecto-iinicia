@@ -22,7 +22,10 @@ private data class ModuloGestion(
 )
 
 @Composable
-fun RoleManagementScreen(onClose: () -> Unit) {
+fun RoleManagementScreen(
+    rutaInicial: String? = null,
+    onClose: () -> Unit
+) {
     val context = LocalContext.current
     val repository = remember {
         IiniciaRepository(context.applicationContext)
@@ -170,6 +173,21 @@ fun RoleManagementScreen(onClose: () -> Unit) {
         }
     }
 
+
+    LaunchedEffect(roles, rutaInicial) {
+        if (roles.isNotEmpty() && rutaInicial != null) {
+            val destino = modulos.firstOrNull {
+                it.ruta == rutaInicial
+            }
+
+            if (destino != null) {
+                consultar(destino)
+            } else {
+                error = "No tienes acceso a este módulo"
+            }
+        }
+    }
+
     AlertDialog(
         onDismissRequest = onClose,
         containerColor = CardBackground,
@@ -306,7 +324,13 @@ private fun GestionDatos(datos: JsonElement) {
                     "cursos", "categorias", "cohortes",
                     "tickets", "solicitudes", "programas",
                     "mapeos", "resumen", "total",
-                    "usuarios", "estudiantes", "profesores"
+                    "usuarios", "estudiantes", "profesores",
+                    "full_name", "program_name",
+                    "previous_school", "average_grade",
+                    "phone", "created_at",
+                    "moodle_synced", "iinicia_sync_state",
+                    "category", "resolved_at", "updated_at"
+
                 )) {
                     if (campo.value.isJsonPrimitive) {
                         Text(

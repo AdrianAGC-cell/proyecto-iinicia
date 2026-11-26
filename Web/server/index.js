@@ -25,11 +25,58 @@ const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://rcsamjsjaeyirrein
 const SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJjc2FtanNqYWV5aXJyZWluZmxuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ0NDg1MDIsImV4cCI6MjExMDAyNDUwMn0.XujGoPht4DjP7eBx2uOXewW0Rx6RkZnJOeOI4Jy-SL8';
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
+const origenesPermitidos = new Set([
+  'http://localhost:5173',
+  'https://web-kappa-one-49.vercel.app'
+]);
+
+app.disable('x-powered-by');
+app.set('trust proxy', 'loopback');
+
 app.use(cors({
-  origin: true,
+  origin: (origin, callback) => {
+    callback(null, !origin || origenesPermitidos.has(origin));
+  },
   credentials: true
 }));
-app.use(express.json());
+
+app.use((req, res, next) => {
+  const origin = req.get('Origin');
+
+  if (
+    !['GET', 'HEAD', 'OPTIONS'].includes(req.method) &&
+    origin &&
+    !origenesPermitidos.has(origin)
+  ) {
+    return res.status(403).json({
+      success: false,
+      error: 'Origen no autorizado'
+    });
+  }
+
+  res.set('X-Content-Type-Options', 'nosniff');
+  res.set('Referrer-Policy', 'no-referrer');
+
+  next();
+});
+
+app.use(express.json({ limit: '1mb' }));
+
+// Deshabilitar endpoints antiguos que usan el token general.
+app.use('/api/moodle', (req, res) => {
+  return res.status(410).json({
+    success: false,
+    error: 'Utiliza los servicios autenticados de IINICIA'
+  });
+});
+
+// Las solicitudes deben usar el nuevo servicio autenticado.
+app.use('/api/admissions/apply', (req, res) => {
+  return res.status(410).json({
+    success: false,
+    error: 'Utiliza el modulo de admisiones'
+  });
+});
 
 // Configurar autenticacion y cursos reales con Moodle
 configurarAutenticacion(app);
@@ -344,17 +391,12 @@ const applications = [
 
 // System Status endpoint
 app.get('/api/health', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+
   res.json({
     status: 'operational',
-    service: 'IINICIA Core Backend & Integration Layer',
-    timestamp: new Date().toISOString(),
-    version: '1.0.0',
-    components: {
-      portal: 'React 19 / TypeScript (Operational)',
-      identity: 'Keycloak OIDC / JWT SSO (Ready)',
-      lms: 'Moodle 4.x REST Web Services (Connected)',
-      database: 'PostgreSQL Connection Pool (Healthy)'
-    }
+    service: 'IINICIA Backend',
+    timestamp: new Date().toISOString()
   });
 });
 
@@ -468,7 +510,7 @@ configurarAdmisiones(app);
 
 configurarDiagnosticoTecnico(app);
 
-app.listen(PORT, () => {
+app.listen(PORT, '127.0.0.1', () => {
   console.log(`[IINICIA Backend] API listening on port ${PORT}`);
-  console.log(`[IINICIA Backend] Integrated Moodle Web Services & SSO Ready`);
+  console.log(`[IINICIA Backend] Integrated Moodle Web Services`);
 });

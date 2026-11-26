@@ -67,17 +67,62 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const buildUserFromSupabase = useCallback(
-    async (sbUser: SupabaseAuthUser): Promise<User> => ({
-      id: sbUser.id,
-      name: sbUser.user_metadata?.full_name ||
-            sbUser.user_metadata?.name ||
-            sbUser.email || 'Aspirante',
-      email: sbUser.email || '',
-      role: 'aspirante',
-      roles: ['aspirante'],
-      ambitos: [],
-      avatar: sbUser.user_metadata?.avatar_url
-    }),
+    async (sbUser: SupabaseAuthUser): Promise<User> => {
+
+      if (!sbUser.email_confirmed_at) {
+        throw new Error('Debes confirmar tu correo electronico');
+      }
+
+      const { data, error } = await supabase.auth.getSession();
+
+      if (
+        error ||
+        !data.session?.access_token ||
+        data.session.user.id !== sbUser.id
+      ) {
+        throw new Error('Sesion no verificable');
+      }
+
+      const respuesta = await fetch('/api/auth/institucional', {
+        method: 'POST',
+        credentials: 'include',
+        cache: 'no-store',
+        headers: {
+          Authorization: `Bearer ${data.session.access_token}`
+        }
+      });
+
+      const resultado = await respuesta.json();
+
+      if (!respuesta.ok || resultado.success !== true) {
+        throw new Error(
+          resultado.error || 'No se pudo verificar tu identidad institucional'
+        );
+      }
+
+      if (resultado.institucional === true) {
+        return convertirUsuarioMoodle(resultado.usuario);
+      }
+
+      if (
+        resultado.institucional !== false ||
+        resultado.rol !== 'aspirante'
+      ) {
+        throw new Error('Respuesta institucional invalida');
+      }
+
+      return {
+        id: sbUser.id,
+        name: sbUser.user_metadata?.full_name ||
+              sbUser.user_metadata?.name ||
+              sbUser.email || 'Aspirante',
+        email: sbUser.email || '',
+        role: 'aspirante',
+        roles: ['aspirante'],
+        ambitos: [],
+        avatar: sbUser.user_metadata?.avatar_url
+      };
+    },
     []
   );
 
@@ -88,6 +133,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const restaurar = async () => {
       try {
+
+        const { data: sesion } =
+          await supabase.auth.getSession();
+
+        if (sesion.session) {
+          const { data, error } =
+            await supabase.auth.getUser();
+
+          if (error || !data.user) {
+            throw new Error('Sesion Supabase no verificable');
+          }
+
+          const identidad =
+            await buildUserFromSupabase(data.user);
+
+          if (activo) setUser(identidad);
+
+          return;
+        }
+
         const respuesta = await fetch('/api/auth/me', {
           credentials: 'include',
           cache: 'no-store'
@@ -122,6 +187,63 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       activo = false;
     };
   }, [buildUserFromSupabase]);
+
+  // Renovacion periodica de la identidad Supabase.
+  useEffect(() => {
+    if (!user) return;
+
+    let activo = true;
+    let renovando = false;
+
+    const renovar = async () => {
+      if (!activo || renovando) return;
+
+      renovando = true;
+
+      try {
+        const { data, error } =
+          await supabase.auth.getSession();
+
+        if (error) throw error;
+
+        if (!data.session) return;
+
+        const identidad = await supabase.auth.getUser();
+
+        if (identidad.error || !identidad.data.user) {
+          throw new Error('Sesion no verificable');
+        }
+
+        const actualizado =
+          await buildUserFromSupabase(identidad.data.user);
+
+        if (activo) setUser(actualizado);
+
+      } catch (_) {
+        if (activo) {
+          await fetch('/api/auth/logout', {
+            method: 'POST',
+            credentials: 'include'
+          }).catch(() => undefined);
+
+          if (activo) setUser(null);
+        }
+      } finally {
+        renovando = false;
+      }
+    };
+
+    const intervalo = window.setInterval(
+      () => void renovar(),
+      45 * 60 * 1000
+    );
+
+    return () => {
+      activo = false;
+      window.clearInterval(intervalo);
+    };
+
+  }, [user?.id, buildUserFromSupabase]);
 
   // Login: Soporta Moodle (mantener intacto) y Supabase signInWithPassword
   const login = async (email: string, password?: string): Promise<AuthResponse> => {
@@ -250,6 +372,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Inicio de sesión con Google OAuth
   const loginWithGoogle = async (): Promise<AuthResponse> => {
     try {
+      const cierre = await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include'
+      });
+
+      if (!cierre.ok) {
+        return {
+          success: false,
+          error: 'No se pudo cerrar la sesion anterior'
+        };
+      }
+
+      setUser(null);
+
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {

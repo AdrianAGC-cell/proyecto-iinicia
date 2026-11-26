@@ -62,6 +62,17 @@ fun ManagementActions(
     val coordinador = roles.contains("coordinador")
     val soporte = superadmin || roles.contains("soporte")
 
+
+    if (
+        ruta == "api/auth/admisiones/mis-solicitudes" &&
+        roles.contains("aspirante")
+    ) {
+        AdmissionForm(
+            repository = repository,
+            onSaved = onSaved
+        )
+    }
+
     val acciones = mutableListOf<AccionGestion>()
 
     fun agregar(

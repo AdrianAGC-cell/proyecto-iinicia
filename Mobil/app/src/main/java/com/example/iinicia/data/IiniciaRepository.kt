@@ -1,6 +1,7 @@
 package com.example.iinicia.data
 
 import android.content.Context
+import kotlinx.coroutines.sync.withLock
 import android.util.Patterns
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -31,13 +32,40 @@ class IiniciaRepository(context: Context) {
     // En el emulador Android, 10.0.2.2 apunta a la computadora anfitriona.
     private val moodleClient = OkHttpClient.Builder()
         .cookieJar(MoodleSessionCookies)
+        .addInterceptor { chain ->
+            val request = chain.request()
+            val token = tokenAspirante
+            val ruta = request.url.encodedPath
+
+            val permitido = ruta in setOf(
+                "/api/auth/admisiones/mis-solicitudes",
+                "/api/auth/admisiones/solicitudes",
+                "/api/auth/soporte/mis-tickets"
+            )
+
+            val nueva = if (
+                token != null &&
+                permitido &&
+                request.url.host == "yolitomsi.tail54d206.ts.net" &&
+                request.url.port == 443
+            ) {
+                request.newBuilder()
+                    .header("Authorization", "Bearer $token")
+                    .build()
+            } else {
+                request
+            }
+
+            chain.proceed(nueva)
+        }
+
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(180, TimeUnit.SECONDS)
         .writeTimeout(120, TimeUnit.SECONDS)
         .build()
 
     private val moodleRetrofit = Retrofit.Builder()
-        .baseUrl("http://127.0.0.1:5000/")
+        .baseUrl("https://yolitomsi.tail54d206.ts.net/")
         .client(moodleClient)
         .addConverterFactory(GsonConverterFactory.create())
         .build()
@@ -55,6 +83,16 @@ class IiniciaRepository(context: Context) {
 
     companion object {
         var currentUser: UserDto? = null
+
+        private var tokenAspirante: String? = null
+        private var tokenSupabase: String? = null
+        private var refreshSupabase: String? = null
+        private var renovarAntes: Long = 0L
+
+        private val mutexSesion =
+            kotlinx.coroutines.sync.Mutex()
+
+
     }
 
     val demoUser = UserDto(
@@ -150,6 +188,11 @@ class IiniciaRepository(context: Context) {
 
         MoodleSessionCookies.clear()
         tokenManager.clear()
+        currentUser = null
+        tokenAspirante = null
+        tokenSupabase = null
+        refreshSupabase = null
+        renovarAntes = 0L
 
         // 1. Intentar inicio de sesión real con Moodle (mantener 100% intacto)
         try {
@@ -184,8 +227,481 @@ class IiniciaRepository(context: Context) {
             // Moodle offline o sin servidor local disponible en este momento
         }
 
+        if (tipo == "correo") {
+            return iniciarSesionAspirante(identificador, pass)
+        }
+
         return Result.failure(
             Exception("No se pudo autenticar en Moodle. Verifica tus credenciales y la conexion.")
+        )
+    }
+
+
+    private suspend fun iniciarSesionAspirante(
+        email: String,
+        password: String
+    ): Result<LoginResponse> {
+        return try {
+
+            MoodleSessionCookies.clear()
+
+            val cuerpo = com.google.gson.JsonObject().apply {
+                addProperty("email", email)
+                addProperty("password", password)
+            }
+
+            val respuesta = supabaseApi.autenticarSupabase(
+                SupabaseClient.SUPABASE_KEY,
+                "password",
+                cuerpo
+            )
+
+            if (!respuesta.isSuccessful) {
+                respuesta.errorBody()?.close()
+                throw Exception(
+                    "Credenciales incorrectas o correo sin confirmar"
+                )
+            }
+
+            val token = respuesta.body()?.get("access_token")
+                ?.asString
+                ?: throw Exception("Sesion no disponible")
+
+            val identidad = supabaseApi.identidadSupabase(
+                SupabaseClient.SUPABASE_KEY,
+                "Bearer $token"
+            )
+
+            val datos = identidad.body()
+
+            if (!identidad.isSuccessful || datos == null) {
+                throw Exception("No se pudo verificar la identidad")
+            }
+
+            if (
+                datos.get("email_confirmed_at") == null ||
+                datos.get("email_confirmed_at").isJsonNull
+            ) {
+                throw Exception("Confirma tu correo electronico")
+            }
+
+            val correo = datos.get("email").asString
+
+            val metadata = datos.getAsJsonObject("user_metadata")
+
+            val nombre = metadata?.get("full_name")
+                ?.takeUnless { it.isJsonNull }?.asString
+                ?: metadata?.get("name")
+                    ?.takeUnless { it.isJsonNull }?.asString
+                ?: correo
+
+            val usuario = UserDto(
+                id = datos.get("id").asString,
+                name = nombre,
+                email = correo,
+                role = "aspirante",
+                moodleId = ""
+            )
+
+            val identidadInstitucional =
+                resolverUsuarioInstitucional(token, usuario)
+
+            refreshSupabase = respuesta.body()
+                ?.get("refresh_token")
+                ?.takeUnless { it.isJsonNull }
+                ?.asString
+
+            renovarAntes = System.currentTimeMillis() +
+                30 * 60 * 1000L
+
+            tokenSupabase = token
+            currentUser = identidadInstitucional
+
+            Result.success(
+                LoginResponse(
+                    token = "",
+                    user = identidadInstitucional
+                )
+            )
+
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            tokenAspirante = null
+            tokenSupabase = null
+            refreshSupabase = null
+            renovarAntes = 0L
+            currentUser = null
+            Result.failure(e)
+        }
+    }
+
+
+    suspend fun consultarProgramasAdmisiones():
+        Result<com.google.gson.JsonArray> {
+        return try {
+            renovarSesionSiNecesario()
+            val token = tokenAspirante
+                ?: throw Exception("Inicia sesion como aspirante")
+
+            val respuesta = supabaseApi.programasAdmisiones(
+                SupabaseClient.SUPABASE_KEY,
+                "Bearer $token"
+            )
+
+            val datos = respuesta.body()
+
+            if (!respuesta.isSuccessful || datos == null) {
+                throw Exception("No se pudieron consultar los programas")
+            }
+
+            Result.success(datos)
+
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+
+    suspend fun registrarAspirante(
+        nombre: String,
+        correo: String,
+        password: String
+    ): Result<Unit> {
+        return try {
+
+            require(nombre.trim().length in 3..150) {
+                "Ingresa tu nombre completo"
+            }
+
+            require(Patterns.EMAIL_ADDRESS.matcher(correo).matches()) {
+                "Ingresa un correo electronico valido"
+            }
+
+            require(password.length >= 8) {
+                "La contraseña debe tener al menos 8 caracteres"
+            }
+
+            val cuerpo = com.google.gson.JsonObject().apply {
+                addProperty("email", correo.trim())
+                addProperty("password", password)
+
+                add("data", com.google.gson.JsonObject().apply {
+                    addProperty("full_name", nombre.trim())
+                    addProperty("name", nombre.trim())
+                    addProperty("role", "aspirante")
+                })
+            }
+
+            val respuesta = supabaseApi.registrarSupabase(
+                SupabaseClient.SUPABASE_KEY,
+                cuerpo
+            )
+
+            if (!respuesta.isSuccessful) {
+                respuesta.errorBody()?.close()
+                throw Exception(
+                    "No se pudo registrar la cuenta. Revisa los datos o intenta mas tarde."
+                )
+            }
+
+            Result.success(Unit)
+
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun recuperarCuenta(correo: String): Result<Unit> {
+        return try {
+
+            require(Patterns.EMAIL_ADDRESS.matcher(correo).matches()) {
+                "Ingresa un correo electronico valido"
+            }
+
+            val cuerpo = com.google.gson.JsonObject().apply {
+                addProperty("email", correo.trim())
+            }
+
+            val respuesta = supabaseApi.recuperarSupabase(
+                SupabaseClient.SUPABASE_KEY,
+                "https://web-kappa-one-49.vercel.app/recuperar-password",
+                cuerpo
+            )
+
+            if (!respuesta.isSuccessful) {
+                respuesta.errorBody()?.close()
+                throw Exception(
+                    "No se pudo solicitar la recuperacion"
+                )
+            }
+
+            Result.success(Unit)
+
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+
+    suspend fun completarGoogle(
+        codigo: String,
+        verifier: String
+    ): Result<LoginResponse> {
+        return try {
+
+            MoodleSessionCookies.clear()
+            tokenManager.clear()
+            tokenAspirante = null
+            tokenSupabase = null
+            refreshSupabase = null
+            renovarAntes = 0L
+            currentUser = null
+
+            val cuerpo = com.google.gson.JsonObject().apply {
+                addProperty("auth_code", codigo)
+                addProperty("code_verifier", verifier)
+            }
+
+            val respuesta = supabaseApi.autenticarSupabase(
+                SupabaseClient.SUPABASE_KEY,
+                "pkce",
+                cuerpo
+            )
+
+            if (!respuesta.isSuccessful) {
+                respuesta.errorBody()?.close()
+                throw Exception(
+                    "No se pudo completar el acceso con Google"
+                )
+            }
+
+            val token = respuesta.body()?.get("access_token")
+                ?.takeUnless { it.isJsonNull }
+                ?.asString
+                ?: throw Exception("Sesion Google no disponible")
+
+            val identidad = supabaseApi.identidadSupabase(
+                SupabaseClient.SUPABASE_KEY,
+                "Bearer $token"
+            )
+
+            val datos = identidad.body()
+
+            if (
+                !identidad.isSuccessful ||
+                datos == null ||
+                datos.get("email_confirmed_at") == null ||
+                datos.get("email_confirmed_at").isJsonNull
+            ) {
+                throw Exception("Cuenta Google no verificada")
+            }
+
+            val correo = datos.get("email").asString
+            val metadata = datos.getAsJsonObject("user_metadata")
+
+            val nombre = metadata?.get("full_name")
+                ?.takeUnless { it.isJsonNull }?.asString
+                ?: metadata?.get("name")
+                    ?.takeUnless { it.isJsonNull }?.asString
+                ?: correo
+
+            val usuario = UserDto(
+                id = datos.get("id").asString,
+                name = nombre,
+                email = correo,
+                role = "aspirante",
+                moodleId = ""
+            )
+
+            val identidadInstitucional =
+                resolverUsuarioInstitucional(token, usuario)
+
+            refreshSupabase = respuesta.body()
+                ?.get("refresh_token")
+                ?.takeUnless { it.isJsonNull }
+                ?.asString
+
+            renovarAntes = System.currentTimeMillis() +
+                30 * 60 * 1000L
+
+            tokenSupabase = token
+            currentUser = identidadInstitucional
+
+            Result.success(
+                LoginResponse(
+                    token = "",
+                    user = identidadInstitucional
+                )
+            )
+
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            tokenAspirante = null
+            tokenSupabase = null
+            refreshSupabase = null
+            renovarAntes = 0L
+            currentUser = null
+            Result.failure(e)
+        }
+    }
+
+
+    private suspend fun renovarSesionSiNecesario() {
+        mutexSesion.withLock {
+
+            val anterior = tokenSupabase
+                ?: return@withLock
+
+            if (
+                System.currentTimeMillis() < renovarAntes
+            ) {
+                return@withLock
+            }
+
+            val refresh = refreshSupabase
+                ?: throw Exception(
+                    "Tu sesion vencio. Inicia sesion nuevamente."
+                )
+
+            val usuarioAnterior = currentUser
+                ?: throw Exception("No hay una sesion activa")
+
+            val cuerpo = com.google.gson.JsonObject().apply {
+                addProperty("refresh_token", refresh)
+            }
+
+            val respuesta = supabaseApi.autenticarSupabase(
+                SupabaseClient.SUPABASE_KEY,
+                "refresh_token",
+                cuerpo
+            )
+
+            val datos = respuesta.body()
+
+            if (!respuesta.isSuccessful || datos == null) {
+                respuesta.errorBody()?.close()
+                throw Exception(
+                    "No se pudo renovar la sesion. Vuelve a iniciar sesion."
+                )
+            }
+
+            val nuevoToken = datos.get("access_token")
+                ?.takeUnless { it.isJsonNull }
+                ?.asString
+                ?: throw Exception("Sesion no disponible")
+
+            val nuevoRefresh = datos.get("refresh_token")
+                ?.takeUnless { it.isJsonNull }
+                ?.asString
+                ?: throw Exception("Renovacion no disponible")
+
+            if (tokenSupabase != anterior) {
+                throw Exception("La sesion cambio")
+            }
+
+            refreshSupabase = nuevoRefresh
+            tokenSupabase = nuevoToken
+
+            try {
+                val usuario = resolverUsuarioInstitucional(
+                    nuevoToken,
+                    usuarioAnterior
+                )
+
+                if (
+                    usuario.id != usuarioAnterior.id ||
+                    usuario.role != usuarioAnterior.role
+                ) {
+                    throw Exception(
+                        "Tu identidad cambio. Inicia sesion nuevamente."
+                    )
+                }
+
+                currentUser = usuario
+
+                renovarAntes = System.currentTimeMillis() +
+                    30 * 60 * 1000L
+
+            } catch (e: Exception) {
+                tokenSupabase = null
+                tokenAspirante = null
+                refreshSupabase = null
+                renovarAntes = 0L
+                currentUser = null
+                MoodleSessionCookies.clear()
+                tokenManager.clear()
+                throw e
+            }
+        }
+    }
+
+    private suspend fun resolverUsuarioInstitucional(
+        token: String,
+        aspirante: UserDto
+    ): UserDto {
+
+        val respuesta = moodleApi.autenticarInstitucional(
+            "Bearer $token"
+        )
+
+        val datos = respuesta.body()
+
+        if (
+            !respuesta.isSuccessful ||
+            datos == null ||
+            datos.get("success")?.asBoolean != true
+        ) {
+            respuesta.errorBody()?.close()
+            throw Exception(
+                "No se pudo verificar tu identidad institucional"
+            )
+        }
+
+        if (
+            datos.get("institucional")?.asBoolean == false &&
+            datos.get("rol")?.asString == "aspirante"
+        ) {
+            tokenAspirante = token
+            return aspirante
+        }
+
+        if (datos.get("institucional")?.asBoolean != true) {
+            throw Exception("Identidad institucional invalida")
+        }
+
+        val usuario = datos.getAsJsonObject("usuario")
+            ?: throw Exception("Usuario institucional no disponible")
+
+        val roles = usuario.getAsJsonArray("roles")
+            ?.map { it.asString }
+            ?: emptyList()
+
+        if (
+            roles.size != 1 ||
+            roles.firstOrNull() != "estudiante"
+        ) {
+            throw Exception("Rol institucional incompatible")
+        }
+
+        val id = usuario.get("id")?.asString
+            ?: throw Exception("Identificador Moodle no disponible")
+
+        tokenAspirante = null
+
+        return UserDto(
+            id = id,
+            name = usuario.get("nombre").asString,
+            email = usuario.get("email").asString,
+            role = "estudiante",
+            moodleId = id
         )
     }
 
@@ -218,15 +734,62 @@ class IiniciaRepository(context: Context) {
     }
 
     suspend fun cerrarSesionMoodle() {
+
+        val token = tokenSupabase ?: tokenAspirante
+
+        tokenAspirante = null
+        tokenSupabase = null
+        refreshSupabase = null
+        renovarAntes = 0L
         currentUser = null
+
+        var fallo = false
+
         try {
-            val response = moodleApi.moodleLogout()
-            if (!response.isSuccessful) {
-                throw Exception("No se pudo cerrar la sesión en el servidor")
+            try {
+                val respuesta = moodleApi.moodleLogout()
+
+                if (!respuesta.isSuccessful &&
+                    respuesta.code() != 401
+                ) {
+                    fallo = true
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                fallo = true
             }
+
+            if (token != null) {
+                try {
+                    val respuesta = supabaseApi.cerrarSupabase(
+                        SupabaseClient.SUPABASE_KEY,
+                        "Bearer $token"
+                    )
+
+                    respuesta.body()?.close()
+                    respuesta.errorBody()?.close()
+
+                    if (!respuesta.isSuccessful) {
+                        fallo = true
+                    }
+
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    fallo = true
+                }
+            }
+
         } finally {
             MoodleSessionCookies.clear()
             tokenManager.clear()
+        }
+
+        if (fallo) {
+            throw Exception(
+                "Sesion local cerrada. Cierre remoto no confirmado."
+            )
         }
     }
 
@@ -319,6 +882,7 @@ class IiniciaRepository(context: Context) {
         operacion: suspend () -> retrofit2.Response<com.google.gson.JsonObject>
     ): Result<com.google.gson.JsonObject> {
         return try {
+            renovarSesionSiNecesario()
             val response = operacion()
             val body = response.body()
 
@@ -424,8 +988,59 @@ class IiniciaRepository(context: Context) {
         }
 
 
-    suspend fun identidadReal() = operacionEntrega {
-        moodleApi.getRealIdentity()
+    suspend fun identidadReal(): Result<com.google.gson.JsonObject> {
+
+        try {
+            renovarSesionSiNecesario()
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return Result.failure(e)
+        }
+
+        val token = tokenAspirante
+
+        if (token != null) {
+            return try {
+                val respuesta = supabaseApi.identidadSupabase(
+                    SupabaseClient.SUPABASE_KEY,
+                    "Bearer $token"
+                )
+
+                val datos = respuesta.body()
+
+                if (
+                    !respuesta.isSuccessful ||
+                    datos == null ||
+                    datos.get("email_confirmed_at") == null ||
+                    datos.get("email_confirmed_at").isJsonNull
+                ) {
+                    throw Exception("Sesion de aspirante no valida")
+                }
+
+                Result.success(
+                    com.google.gson.JsonObject().apply {
+                        addProperty("success", true)
+                        add("usuario", com.google.gson.JsonObject().apply {
+                            addProperty("id", datos.get("id").asString)
+                            addProperty("email", datos.get("email").asString)
+                            add("roles", com.google.gson.JsonArray().apply {
+                                add("aspirante")
+                            })
+                        })
+                    }
+                )
+
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
+        return operacionEntrega {
+            moodleApi.getRealIdentity()
+        }
     }
 
     suspend fun consultarGestion(ruta: String) = operacionEntrega {
@@ -507,6 +1122,18 @@ class IiniciaRepository(context: Context) {
         }
 
     suspend fun getCourses(): Result<List<CourseDto>> {
+
+        try {
+            renovarSesionSiNecesario()
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return Result.failure(e)
+        }
+        if (tokenAspirante != null) {
+            return Result.success(emptyList())
+        }
+
         return try {
             val perfil = moodleApi.moodleProfile()
 

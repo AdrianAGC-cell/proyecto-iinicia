@@ -173,8 +173,12 @@ fun DashboardScreen(
         )
     }
 
+    var rutaGestion by remember(user.id) {
+        mutableStateOf<String?>(null)
+    }
+
     if (mostrarGestion) {
-        RoleManagementScreen(
+        RoleManagementScreen(rutaInicial = rutaGestion,
             onClose = { mostrarGestion = false }
         )
     }
@@ -204,7 +208,10 @@ fun DashboardScreen(
 
                 NavigationBarItem(
                     selected = mostrarGestion,
-                    onClick = { mostrarGestion = true },
+                    onClick = {
+                        rutaGestion = null
+                        mostrarGestion = true
+                    },
                     icon = {
                         Icon(Icons.Default.Search, null)
                     },
@@ -297,7 +304,10 @@ fun DashboardScreen(
                         TarjetaPortal(
                             "Administración institucional",
                             "Resumen, usuarios y servicios"
-                        ) { mostrarGestion = true }
+                        ) {
+                            rutaGestion = "api/auth/admin/resumen"
+                            mostrarGestion = true
+                        }
                     }
                 }
 
@@ -306,7 +316,10 @@ fun DashboardScreen(
                         TarjetaPortal(
                             "Diagnóstico técnico",
                             "Estado de los servicios de IINICIA"
-                        ) { mostrarGestion = true }
+                        ) {
+                            rutaGestion = "api/auth/admin/diagnostico"
+                            mostrarGestion = true
+                        }
                     }
                 }
 
@@ -315,7 +328,10 @@ fun DashboardScreen(
                         TarjetaPortal(
                             "Gestión académica",
                             "Cursos y categorías autorizadas"
-                        ) { mostrarGestion = true }
+                        ) {
+                            rutaGestion = "api/auth/admin/cursos"
+                            mostrarGestion = true
+                        }
                     }
                 }
 
@@ -324,7 +340,10 @@ fun DashboardScreen(
                         TarjetaPortal(
                             "Admisiones y matrículas",
                             "Solicitudes, programas y cohortes"
-                        ) { mostrarGestion = true }
+                        ) {
+                            rutaGestion = "api/auth/admisiones/admin/solicitudes"
+                            mostrarGestion = true
+                        }
                     }
                 }
 
@@ -333,7 +352,10 @@ fun DashboardScreen(
                         TarjetaPortal(
                             "Portal docente",
                             "Cursos y actividades asignadas"
-                        ) { mostrarGestion = true }
+                        ) {
+                            rutaGestion = "api/auth/courses"
+                            mostrarGestion = true
+                        }
                     }
                 }
 
@@ -342,7 +364,10 @@ fun DashboardScreen(
                         TarjetaPortal(
                             "Mis solicitudes",
                             "Seguimiento de admisión"
-                        ) { mostrarGestion = true }
+                        ) {
+                            rutaGestion = "api/auth/admisiones/mis-solicitudes"
+                            mostrarGestion = true
+                        }
                     }
                 }
 
@@ -351,7 +376,10 @@ fun DashboardScreen(
                         TarjetaPortal(
                             "Atención de tickets",
                             "Revisión y resolución de incidencias"
-                        ) { mostrarGestion = true }
+                        ) {
+                            rutaGestion = "api/auth/soporte/tickets"
+                            mostrarGestion = true
+                        }
                     }
                 }
 
@@ -359,7 +387,10 @@ fun DashboardScreen(
                     TarjetaPortal(
                         "Soporte",
                         "Consultar o registrar una incidencia"
-                    ) { mostrarGestion = true }
+                    ) {
+                            rutaGestion = "api/auth/soporte/mis-tickets"
+                            mostrarGestion = true
+                        }
                 }
             }
 

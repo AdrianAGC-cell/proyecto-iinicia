@@ -109,6 +109,27 @@ fun LoginScreen(
     }
     val authState by authViewModel.authState.collectAsState()
 
+    val retornoGoogle by
+        com.example.iinicia.data.GoogleOAuth.retorno.collectAsState()
+
+    LaunchedEffect(retornoGoogle) {
+        retornoGoogle?.let {
+            authViewModel.completarGoogle(it)
+        }
+    }
+
+
+    val mensajeCuenta by authViewModel.mensajeCuenta.collectAsState()
+
+    var mostrarRecuperacion by remember {
+        mutableStateOf(false)
+    }
+
+    var correoRecuperacion by remember {
+        mutableStateOf("")
+    }
+
+
     LaunchedEffect(authState) {
         if (authState is AuthState.Success) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -303,6 +324,20 @@ fun LoginScreen(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
+
+                TextButton(
+                    enabled = authState !is AuthState.Loading,
+                    onClick = {
+                        correoRecuperacion = email.trim()
+                        mostrarRecuperacion = true
+                    }
+                ) {
+                    Text(
+                        "Olvide mi contraseña",
+                        color = CyanAccent
+                    )
+                }
+
                 // Register Link
                 TextButton(
                     onClick = { showRegisterDialog = true }
@@ -316,6 +351,89 @@ fun LoginScreen(
                 }
             }
         }
+    }
+
+
+    if (mensajeCuenta.isNotBlank()) {
+        AlertDialog(
+            containerColor = CardBackgroundDark,
+            onDismissRequest = {
+                authViewModel.limpiarMensajeCuenta()
+            },
+            title = {
+                Text("Cuenta IINICIA", color = CyanAccent)
+            },
+            text = {
+                Text(mensajeCuenta, color = Color.White)
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        authViewModel.limpiarMensajeCuenta()
+                    }
+                ) {
+                    Text("Entendido")
+                }
+            }
+        )
+    }
+
+    if (mostrarRecuperacion) {
+        AlertDialog(
+            containerColor = CardBackgroundDark,
+            onDismissRequest = {
+                mostrarRecuperacion = false
+            },
+            title = {
+                Text(
+                    "Recuperar contraseña",
+                    color = CyanAccent
+                )
+            },
+            text = {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        "Ingresa el correo de tu cuenta de aspirante.",
+                        color = Color.White
+                    )
+
+                    OutlinedTextField(
+                        value = correoRecuperacion,
+                        onValueChange = {
+                            correoRecuperacion = it
+                        },
+                        label = { Text("Correo electronico") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    enabled = correoRecuperacion.isNotBlank() &&
+                        authState !is AuthState.Loading,
+                    onClick = {
+                        mostrarRecuperacion = false
+                        authViewModel.recuperarPassword(
+                            correoRecuperacion.trim()
+                        )
+                    }
+                ) {
+                    Text("Enviar instrucciones")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        mostrarRecuperacion = false
+                    }
+                ) {
+                    Text("Cancelar", color = CyanAccent)
+                }
+            }
+        )
     }
 
     // Modal de Registro Rápido en Android
@@ -348,7 +466,7 @@ fun LoginScreen(
                     OutlinedTextField(
                         value = regPassword,
                         onValueChange = { regPassword = it },
-                        label = { Text("Contraseña (mínimo 6 car.)") },
+                        label = { Text("Contraseña (mínimo 8 caracteres)") },
                         visualTransformation = PasswordVisualTransformation(),
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true

@@ -1,111 +1,188 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Mail, ArrowRight, CheckCircle2, ShieldCheck, ArrowLeft, Loader2 } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 export const RecuperarPassword: React.FC = () => {
   const [email, setEmail] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const [password, setPassword] = useState('');
+  const [confirmacion, setConfirmacion] = useState('');
+  const [recuperando, setRecuperando] = useState(false);
+  const [ocupado, setOcupado] = useState(false);
+  const [mensaje, setMensaje] = useState('');
+  const [error, setError] = useState(false);
+  const [terminado, setTerminado] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  useEffect(() => {
+    const { data } = supabase.auth.onAuthStateChange(
+      (evento, sesion) => {
+        if (evento === 'PASSWORD_RECOVERY' && sesion) {
+          setRecuperando(true);
+          setMensaje('');
+        }
+      }
+    );
+
+    return () => data.subscription.unsubscribe();
+  }, []);
+
+  const enviar = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    // Simulación de envío de token de restablecimiento conforme a SSO OIDC
-    setTimeout(() => {
-      setLoading(false);
-      setSubmitted(true);
-    }, 1000);
+    setOcupado(true);
+    setMensaje('');
+    setError(false);
+
+    try {
+      if (recuperando) {
+        if (password.length < 8) {
+          throw new Error(
+            'La contraseña debe tener al menos 8 caracteres.'
+          );
+        }
+
+        if (password !== confirmacion) {
+          throw new Error('Las contraseñas no coinciden.');
+        }
+
+        const resultado = await supabase.auth.updateUser({
+          password
+        });
+
+        if (resultado.error) throw resultado.error;
+
+        await fetch('/api/auth/logout', {
+          method: 'POST',
+          credentials: 'include'
+        });
+
+        const cierre = await supabase.auth.signOut();
+
+        if (cierre.error) throw cierre.error;
+
+        setPassword('');
+        setConfirmacion('');
+        setTerminado(true);
+        setMensaje(
+          'Contraseña actualizada. Ya puedes iniciar sesión.'
+        );
+
+      } else {
+        const resultado =
+          await supabase.auth.resetPasswordForEmail(
+            email.trim(),
+            {
+              redirectTo:
+                window.location.origin + '/recuperar-password'
+            }
+          );
+
+        if (resultado.error) throw resultado.error;
+
+        setMensaje(
+          'Si existe una cuenta asociada, recibirás un correo con las instrucciones.'
+        );
+      }
+    } catch (err: any) {
+      setError(true);
+      setMensaje(
+        err?.message || 'No se pudo completar la operación.'
+      );
+    } finally {
+      setOcupado(false);
+    }
   };
 
   return (
-    <div className="min-h-[80vh] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-6">
-        <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-xl space-y-6">
-          <div className="text-center space-y-3">
-            <Link to="/" className="inline-block">
-              <img
-                src="/logo-iinicia.png"
-                alt="I²NICIA"
-                className="h-16 w-auto mx-auto object-contain"
-              />
-            </Link>
-            <h2 className="text-xl font-black text-slate-900 tracking-tight">
-              Recuperar Contraseña
-            </h2>
-            <p className="text-xs text-slate-500">
-              Ingresa tu correo institucional o de registro para recibir un enlace seguro de restablecimiento de tu identidad I²NICIA.
-            </p>
-          </div>
+    <section className="min-h-[75vh] flex items-center justify-center bg-slate-950 px-5 py-16">
+      <div className="w-full max-w-md rounded-3xl border border-slate-700 bg-slate-900 p-8 shadow-2xl">
 
-          {submitted ? (
-            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-6 text-center space-y-3 animate-fadeIn">
-              <CheckCircle2 className="w-12 h-12 text-emerald-600 mx-auto" />
-              <h3 className="text-sm font-bold text-emerald-900">Enlace de Seguridad Enviado</h3>
-              <p className="text-xs text-emerald-700 leading-relaxed">
-                Hemos enviado instrucciones de recuperación a <strong className="text-emerald-900">{email}</strong>. El enlace tiene una vigencia de 15 minutos de acuerdo con las políticas de seguridad OIDC.
-              </p>
-              <div className="pt-2">
-                <Link
-                  to="/login"
-                  className="inline-flex items-center gap-1.5 text-xs font-bold text-[#22abe2] hover:underline"
-                >
-                  <span>Volver al inicio de sesión</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
-              </div>
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                  Correo Electrónico Institucional *
-                </label>
-                <div className="relative">
-                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input
-                    type="email"
-                    required
-                    placeholder="ej. valeria.morales@iinicia.edu.mx"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-[#22abe2] focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-600 flex items-start gap-2">
-                <ShieldCheck className="w-4 h-4 text-[#22abe2] shrink-0 mt-0.5" />
-                <span>Al cambiar tu contraseña, se actualizará automáticamente tu acceso al Portal Web, Campus Virtual Moodle y la App Android (SSO Unificado).</span>
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-3 rounded-xl bg-[#22abe2] hover:bg-[#1b9ad0] text-white font-bold text-xs uppercase tracking-wider transition shadow-md hover:shadow-lg flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Enviando enlace seguro...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Enviar enlace de restablecimiento</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </>
-                )}
-              </button>
-
-              <div className="text-center pt-2">
-                <Link to="/login" className="text-xs text-slate-500 hover:text-slate-800 transition inline-flex items-center gap-1">
-                  <ArrowLeft className="w-3.5 h-3.5" />
-                  <span>Cancelar y regresar al login</span>
-                </Link>
-              </div>
-            </form>
-          )}
+        <div className="text-cyan-400 font-bold tracking-widest mb-5">
+          IINICIA
         </div>
+
+        <h1 className="text-3xl font-bold text-white mb-3">
+          {recuperando
+            ? 'Nueva contraseña'
+            : 'Recuperar contraseña'}
+        </h1>
+
+        <p className="text-slate-400 mb-7">
+          {recuperando
+            ? 'Establece una nueva contraseña para tu cuenta.'
+            : 'Recupera el acceso a tu cuenta institucional.'}
+        </p>
+
+        {!terminado && (
+          <form onSubmit={enviar} className="space-y-5">
+
+            {recuperando ? (
+              <>
+                <input
+                  type="password"
+                  required
+                  minLength={8}
+                  autoComplete="new-password"
+                  placeholder="Nueva contraseña"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  className="w-full rounded-xl border border-slate-600 bg-slate-800 p-4 text-white"
+                />
+
+                <input
+                  type="password"
+                  required
+                  minLength={8}
+                  autoComplete="new-password"
+                  placeholder="Confirmar contraseña"
+                  value={confirmacion}
+                  onChange={e => setConfirmacion(e.target.value)}
+                  className="w-full rounded-xl border border-slate-600 bg-slate-800 p-4 text-white"
+                />
+              </>
+            ) : (
+              <input
+                type="email"
+                required
+                autoComplete="email"
+                placeholder="Correo electrónico"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                className="w-full rounded-xl border border-slate-600 bg-slate-800 p-4 text-white"
+              />
+            )}
+
+            <button
+              disabled={ocupado}
+              className="w-full rounded-xl bg-cyan-400 p-4 font-bold text-slate-950 hover:bg-cyan-300 disabled:opacity-50"
+            >
+              {ocupado
+                ? 'Procesando...'
+                : recuperando
+                ? 'Guardar contraseña'
+                : 'Enviar correo de recuperación'}
+            </button>
+          </form>
+        )}
+
+        {mensaje && (
+          <div
+            role="status"
+            className={`mt-5 rounded-xl border p-4 ${
+              error
+                ? 'border-red-500/40 bg-red-500/10 text-red-300'
+                : 'border-cyan-500/40 bg-cyan-500/10 text-cyan-300'
+            }`}
+          >
+            {mensaje}
+          </div>
+        )}
+
+        <Link
+          to="/login"
+          className="block mt-7 text-center text-cyan-400"
+        >
+          Volver a iniciar sesión
+        </Link>
       </div>
-    </div>
+    </section>
   );
 };

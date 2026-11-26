@@ -105,3 +105,56 @@ $functions['local_iinicia_course_permissions'] = [
     'ajax' => false,
     'services' => [MOODLE_OFFICIAL_MOBILE_SERVICE]
 ];
+
+
+$functions['local_iinicia_assignment_settings'] = [
+    'classname' => 'local_iinicia\external\assignment_settings',
+    'methodname' => 'execute',
+    'description' => 'Edicion docente IINICIA: assignment_settings',
+    'type' => 'read',
+    'ajax' => false,
+    'services' => [MOODLE_OFFICIAL_MOBILE_SERVICE]
+];
+
+
+$functions['local_iinicia_update_assignment'] = [
+    'classname' => 'local_iinicia\external\update_assignment',
+    'methodname' => 'execute',
+    'description' => 'Edicion docente IINICIA: update_assignment',
+    'type' => 'write',
+    'ajax' => false,
+    'services' => [MOODLE_OFFICIAL_MOBILE_SERVICE]
+];
+
+
+$functions['local_iinicia_exchange_identity'] = [
+    'classname' => 'local_iinicia\external\exchange_identity',
+    'methodname' => 'execute',
+    'description' => 'Exchange institutional identity',
+    'type' => 'write',
+    'ajax' => false,
+    'capabilities' => 'local/iinicia:exchangeidentity'
+];
+
+
+$functions['local_iinicia_revoke_identity'] = [
+    'classname' => 'local_iinicia\external\revoke_identity',
+    'methodname' => 'execute',
+    'description' => 'Revoke institutional session',
+    'type' => 'write',
+    'ajax' => false,
+    'capabilities' => 'local/iinicia:exchangeidentity'
+];
+
+$services['IINICIA Identity Bridge'] = [
+    'functions' => [
+        'local_iinicia_exchange_identity',
+        'local_iinicia_revoke_identity'
+    ],
+    'restrictedusers' => 1,
+    'enabled' => 1,
+    'shortname' => 'iinicia_identity_bridge',
+    'requiredcapability' => 'local/iinicia:exchangeidentity',
+    'downloadfiles' => 0,
+    'uploadfiles' => 0
+];

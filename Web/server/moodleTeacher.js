@@ -690,7 +690,7 @@ export function configurarProfesorMoodle(app) {
     }
 
     if (revisar && (
-      req.get('origin') !== 'http://localhost:5173' ||
+      !(process.env.WEB_ORIGINS || 'http://localhost:5173').split(',').map(o => o.trim()).includes(req.get('origin')) ||
       !req.is('application/json')
     )) {
       return rechazar(403, 'Solicitud no permitida');
@@ -845,7 +845,7 @@ export function configurarProfesorMoodle(app) {
         return rechazar(401, 'Sesion no activa');
       }
 
-      if (req.get('origin') !== 'http://localhost:5173' ||
+      if (!(process.env.WEB_ORIGINS || 'http://localhost:5173').split(',').map(o => o.trim()).includes(req.get('origin')) ||
           !req.is('application/json')) {
         return rechazar(403, 'Solicitud no permitida');
       }

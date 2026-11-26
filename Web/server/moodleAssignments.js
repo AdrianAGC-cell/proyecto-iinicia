@@ -449,7 +449,7 @@ export function configurarTareasMoodle(app) {
         return rechazar(401, 'Sesion no activa');
       }
 
-      if (req.get('origin') !== 'http://localhost:5173') {
+      if (!(process.env.WEB_ORIGINS || 'http://localhost:5173').split(',').map(o => o.trim()).includes(req.get('origin'))) {
         return rechazar(403, 'Origen no permitido');
       }
 
@@ -543,11 +543,9 @@ export function configurarTareasMoodle(app) {
 
       const origen = req.get('origin');
 
-      if (origen && ![
-        'http://localhost:5173',
-        'http://localhost:5000',
-        'http://127.0.0.1:5173'
-      ].includes(origen)) {
+      if (origen && !(process.env.WEB_ORIGINS ||
+        'http://localhost:5173'
+      ).split(',').map(o => o.trim()).includes(origen)) {
         return res.sendStatus(403);
       }
 
@@ -820,7 +818,7 @@ export function configurarTareasMoodle(app) {
         return rechazar(401, 'Sesion no activa');
       }
 
-      if (req.get('origin') !== 'http://localhost:5173') {
+      if (!(process.env.WEB_ORIGINS || 'http://localhost:5173').split(',').map(o => o.trim()).includes(req.get('origin'))) {
         return rechazar(403, 'Origen no permitido');
       }
 
@@ -940,11 +938,9 @@ export function configurarTareasMoodle(app) {
 
       const origen = req.get('origin');
 
-      if (origen && ![
-        'http://localhost:5173',
-        'http://localhost:5000',
-        'http://127.0.0.1:5173'
-      ].includes(origen)) {
+      if (origen && !(process.env.WEB_ORIGINS ||
+        'http://localhost:5173'
+      ).split(',').map(o => o.trim()).includes(origen)) {
         return res.sendStatus(403);
       }
 

@@ -7,8 +7,11 @@ class AuthInterceptor(private val tokenManager: SecureTokenManager) : Intercepto
     override fun intercept(chain: Interceptor.Chain): Response {
         val token = tokenManager.getToken()
         val requestBuilder = chain.request().newBuilder()
-        if (!token.isNullOrEmpty()) {
-            requestBuilder.addHeader("Authorization", "Bearer $token")
+        if (
+            !token.isNullOrEmpty() &&
+            chain.request().header("Authorization") == null
+        ) {
+            requestBuilder.header("Authorization", "Bearer $token")
         }
         return chain.proceed(requestBuilder.build())
     }

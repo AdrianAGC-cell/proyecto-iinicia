@@ -1,0 +1,77 @@
+$primary: #0891b2;
+$secondary: #0f172a;
+$body-bg: #f1f5f9;
+$body-color: #0f172a;
+$border-radius: 0.8rem;
+
+.navbar.fixed-top {
+    background: #0f172a !important;
+    border-bottom: 3px solid #22d3ee !important;
+}
+
+.navbar.fixed-top .nav-link,
+.navbar.fixed-top .navbar-brand {
+    color: #f8fafc !important;
+}
+
+.navbar.fixed-top .nav-link:hover {
+    color: #22d3ee !important;
+}
+
+.btn-primary {
+    background-color: #0891b2 !important;
+    border-color: #0891b2 !important;
+    color: white !important;
+    border-radius: 10px;
+}
+
+.btn-primary:hover {
+    background-color: #0e7490 !important;
+}
+
+.card {
+    border-radius: 16px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 14px rgba(15,23,42,.06);
+}
+
+.login-wrapper .login-container {
+    background: #0f172a;
+    color: #f8fafc;
+    border-radius: 24px;
+    padding: 36px;
+}
+
+.login-container a {
+    color: #67e8f9;
+}
+
+.login-container .form-control {
+    border-radius: 10px;
+}
+
+#page-login-index {
+    background: linear-gradient(
+        135deg,
+        #020617,
+        #164e63
+    );
+}
+
+#page-footer {
+    background: #0f172a;
+    color: #f8fafc;
+}
+
+.courseindex .courseindex-item.pageitem {
+    background: #0891b2;
+    color: white;
+}
+
+.activity-item {
+    border-radius: 12px;
+}
+
+.progress-bar {
+    background-color: #0891b2;
+}

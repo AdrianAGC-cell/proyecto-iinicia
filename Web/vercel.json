@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/api/:path*",
+      "destination": "https://yolitomsi.tail54d206.ts.net/api/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
