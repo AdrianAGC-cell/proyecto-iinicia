@@ -105,10 +105,12 @@ export const CalificacionMoodle: React.FC<Props> = ({
   }, [courseId, assignmentId, actualizacion]);
 
   const calificada =
-    nota?.graderaw != null &&
-    Number.isFinite(Number(nota.graderaw));
+    nota?.gradeishidden !== true &&
+    typeof nota?.graderaw === 'number' &&
+    Number.isFinite(nota.graderaw) &&
+    nota.graderaw >= 0;
 
-  const comentario = nota?.feedback
+  const comentario = calificada && nota?.feedback
     ? nota.feedbackformat === 2
       ? nota.feedback
       : new DOMParser()
@@ -188,7 +190,7 @@ export const CalificacionMoodle: React.FC<Props> = ({
         </div>
       )}
 
-      {!loading && !error && (
+      {!loading && !error && calificada && (
         <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-2">
 
           <h5 className="flex items-center gap-2 font-bold text-sm text-slate-900">

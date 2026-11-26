@@ -53,8 +53,8 @@ export const MiIinicia: React.FC = () => {
           id: String(c.id),
           code: (c.nombreCorto || '').trim(),
           name: c.nombre,
-          professor: 'Docente Titular IINICIA',
-          progress: c.progress != null ? Math.round(Number(c.progress) * 100) : 0,
+          professor: 'No disponible',
+          progress: c.progress != null ? Math.round(Number(c.progress)) : 0,
           pendingTasks: 0,
           nextDeadline: '',
           grade: 0,
@@ -77,29 +77,89 @@ export const MiIinicia: React.FC = () => {
     loadMoodleCourses();
   }, []);
 
-  const upcomingDeadlines = [
-    {
-      course: 'IA-404: Optimización Numérica',
-      title: 'Entrega de Práctica 4: Algoritmos Genéticos en Python',
-      dueDate: 'Hoy, 23:59',
-      urgent: true,
-      moodleId: 207
-    },
-    {
-      course: 'IA-401: Redes Neuronales y Deep Learning',
-      title: 'Laboratorio 3: Clasificador Convolucional con PyTorch',
-      dueDate: '24 Octubre, 23:59',
-      urgent: false,
-      moodleId: 204
-    },
-    {
-      course: 'IA-402: Cloud Computing & MLOps',
-      title: 'Pipeline CI/CD con Docker y despliegue en clúster K8s',
-      dueDate: '27 Octubre, 18:00',
-      urgent: false,
-      moodleId: 205
+  const [upcomingDeadlines, setUpcomingDeadlines] =
+    useState<{
+      course: string;
+      title: string;
+      dueDate: string;
+      urgent: boolean;
+      moodleId: number;
+      courseId: string;
+    }[]>([]);
+
+  const [errorEntregas, setErrorEntregas] = useState('');
+  const [cargandoEntregas, setCargandoEntregas] = useState(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    if (user?.role !== 'estudiante' || !courses.length) {
+      setUpcomingDeadlines([]);
+      return;
     }
-  ];
+
+    async function cargarEntregas() {
+      setCargandoEntregas(true);
+      setErrorEntregas('');
+
+      try {
+        const resultados = await Promise.all(
+          courses.map(async curso => {
+            const respuesta = await fetch(
+              `/api/auth/courses/${curso.moodleCourseId}/assignments`,
+              {
+                credentials: 'include',
+                signal: controller.signal
+              }
+            );
+
+            const datos = await respuesta.json();
+
+            if (!respuesta.ok || !datos.success) {
+              throw new Error('Consulta no disponible');
+            }
+
+            return (datos.tareas || [])
+              .filter((t: any) =>
+                Number(t.fechaLimite) > Date.now() / 1000
+              )
+              .map((t: any) => ({
+                course: curso.name,
+                title: t.nombre,
+                dueDate: new Date(
+                  t.fechaLimite * 1000
+                ).toLocaleString('es-MX'),
+                urgent: t.fechaLimite * 1000 - Date.now()
+                  < 86400000,
+                moodleId: t.moduloId,
+                courseId: curso.id
+              }));
+          })
+        );
+
+        if (!controller.signal.aborted) {
+          setUpcomingDeadlines(resultados.flat());
+        }
+
+      } catch {
+        if (!controller.signal.aborted) {
+          setUpcomingDeadlines([]);
+          setErrorEntregas(
+            'No se pudieron consultar las actividades.'
+          );
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setCargandoEntregas(false);
+        }
+      }
+    }
+
+    void cargarEntregas();
+
+    return () => controller.abort();
+  }, [courses, user?.role]);
+
 
   return (
     <div className="space-y-8 pb-24 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
@@ -126,21 +186,21 @@ export const MiIinicia: React.FC = () => {
                     ? 'Administrador TI'
                     : user?.role === 'aspirante'
                     ? 'Aspirante en Admisión'
-                    : `Estudiante Regular • ${user?.semester || 1}er Semestre`}
+                    : 'Estudiante'}
                 </span>
                 <span className="text-xs text-slate-400 font-mono">
                   {user?.matricula 
                     ? `Identificador: ${user.matricula}` 
                     : user?.role === 'profesor' 
-                    ? 'Clave Docente: DOC-2026-104' 
-                    : `Matrícula: IIN-2026-${user?.id?.slice(0, 4) || '8842'}`}
+                    ? 'Clave docente no disponible'
+                    : 'Matrícula no disponible'}
                 </span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
                 {user?.name || 'Usuario IINICIA'}
               </h1>
               <p className="text-xs sm:text-sm text-slate-300">
-                {user?.programName || (user?.role === 'profesor' ? 'Facultad de Inteligencia Artificial y Tecnologías Emergentes' : 'Licenciatura en Inteligencia Artificial y Ciencia de Datos')}
+                {user?.programName || 'Programa no disponible'}
               </p>
             </div>
           </div>
@@ -169,21 +229,21 @@ export const MiIinicia: React.FC = () => {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-8 pt-6 border-t border-white/10">
           <div>
             <p className="text-[11px] text-slate-400 uppercase font-semibold">Promedio Ponderado</p>
-            <p className="text-2xl font-black text-white">9.6 / 10</p>
+            <p className="text-2xl font-black text-white">No disponible</p>
           </div>
           <div>
-            <p className="text-[11px] text-slate-400 uppercase font-semibold">Materias Cursadas</p>
-            <p className="text-2xl font-black text-white">18 de 32</p>
+            <p className="text-[11px] text-slate-400 uppercase font-semibold">Cursos inscritos</p>
+            <p className="text-2xl font-black text-white">{loading || courseError ? "—" : courses.length}</p>
           </div>
           <div>
             <p className="text-[11px] text-slate-400 uppercase font-semibold">Créditos Acumulados</p>
-            <p className="text-2xl font-black text-white">160 / 320</p>
+            <p className="text-2xl font-black text-white">No disponible</p>
           </div>
           <div>
-            <p className="text-[11px] text-slate-400 uppercase font-semibold">Moodle SSO Sync</p>
+            <p className="text-[11px] text-slate-400 uppercase font-semibold">Moodle SSO</p>
             <p className="text-2xl font-black text-[#22abe2] flex items-center gap-1.5">
               <CheckCircle2 className="w-5 h-5 text-[#22abe2]" />
-              <span>Activo</span>
+              <span>Pendiente</span>
             </p>
           </div>
         </div>
@@ -193,8 +253,8 @@ export const MiIinicia: React.FC = () => {
       {idCardOpen && (
         <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xl max-w-xl mx-auto animate-fadeIn relative overflow-hidden">
           <div className="flex justify-between items-center border-b border-slate-100 pb-4 mb-4">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Credencial Oficial de Alumno</span>
-            <span className="text-xs font-bold text-[#148ebf] bg-[#22abe2]/10 px-2 py-0.5 rounded">Vigencia: 2026-2027</span>
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Identificación del usuario</span>
+            <span className="text-xs font-bold text-[#148ebf] bg-[#22abe2]/10 px-2 py-0.5 rounded">Sin vigencia verificada</span>
           </div>
 
           <div className="bg-[#05080f] p-6 rounded-2xl text-white flex flex-col sm:flex-row items-center gap-6 shadow-inner border border-slate-800">
@@ -207,10 +267,10 @@ export const MiIinicia: React.FC = () => {
             <div className="space-y-1 text-center sm:text-left">
               <img src="/logo-iinicia-white.png" alt="I²NICIA" className="h-8 w-auto mb-1 mx-auto sm:mx-0" />
               <h4 className="text-base font-black">{user?.name}</h4>
-              <p className="text-xs text-[#22abe2] font-mono">Matrícula: {user?.matricula || 'IIN-2024-8842'}</p>
+              <p className="text-xs text-[#22abe2] font-mono">Matrícula: {user?.matricula || 'No disponible'}</p>
               <p className="text-xs text-slate-300">{user?.programName}</p>
               <div className="pt-2 text-[10px] text-slate-400">
-                Código QR de Validación Institucional (SEP / RVOE)
+                Identificación informativa
               </div>
             </div>
           </div>
@@ -237,7 +297,7 @@ export const MiIinicia: React.FC = () => {
               : 'text-slate-600 hover:bg-slate-100'
           }`}
         >
-          Próximas Entregas ({upcomingDeadlines.length})
+          Próximas actividades ({upcomingDeadlines.length})
         </button>
         <button
           onClick={() => setActiveTab('calificaciones')}
@@ -274,10 +334,10 @@ export const MiIinicia: React.FC = () => {
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-black text-slate-900">
-              Periodo Académico Actual: Otoño 2026
+              Mis cursos de Moodle
             </h2>
             <span className="text-xs text-slate-500">
-              Consulta de Moodle Web Services - Modo prueba
+              Consulta de Moodle Web Services
             </span>
           </div>
 
@@ -350,6 +410,14 @@ export const MiIinicia: React.FC = () => {
         <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
           <h3 className="text-base font-bold text-slate-900">Tareas y Entregables en Moodle</h3>
           <div className="space-y-3">
+            {cargandoEntregas && <p>Consultando actividades...</p>}
+            {errorEntregas && (
+              <p className="text-red-600">{errorEntregas}</p>
+            )}
+            {!cargandoEntregas && !errorEntregas &&
+              upcomingDeadlines.length === 0 && (
+                <p>No hay próximas actividades disponibles.</p>
+              )}
             {upcomingDeadlines.map((item, idx) => (
               <div
                 key={idx}
@@ -367,10 +435,18 @@ export const MiIinicia: React.FC = () => {
                 </div>
 
                 <button
-                  onClick={() => triggerMoodleSSO(item.moodleId)}
+                  onClick={() => {
+                    const curso = courses.find(
+                      c => c.id === item.courseId
+                    );
+                    if (curso) {
+                      setAulaSeleccionada(curso);
+                      setActiveTab('cursos');
+                    }
+                  }}
                   className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-[#22abe2] text-white text-xs font-bold transition flex items-center gap-1.5 shrink-0"
                 >
-                  <span>Subir tarea en Moodle</span>
+                  <span>Abrir curso</span>
                   <ExternalLink className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -383,9 +459,9 @@ export const MiIinicia: React.FC = () => {
       {activeTab === 'calificaciones' && (
         <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-6">
           <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold text-slate-900">Kardex Académico Oficial</h3>
+            <h3 className="text-base font-bold text-slate-900">Consulta académica</h3>
             <button
-              onClick={() => alert('Generando boleta oficial firmada digitalmente con sello SEP/RVOE...')}
+              onClick={() => alert('La emisión de boletas oficiales todavía no está habilitada.')}
               className="px-4 py-2 rounded-xl bg-[#22abe2]/10 text-[#22abe2] text-xs font-bold hover:bg-[#22abe2]/20 transition flex items-center gap-1.5"
             >
               <Download className="w-4 h-4" />
@@ -411,13 +487,13 @@ export const MiIinicia: React.FC = () => {
                     <td className="py-3 px-4 font-mono font-bold text-slate-700">{c.code}</td>
                     <td className="py-3 px-4 font-bold text-slate-900">{c.name}</td>
                     <td className="py-3 px-4 text-slate-600">{c.professor}</td>
-                    <td className="py-3 px-4 text-slate-600">10 Créditos</td>
-                    <td className="py-3 px-4 font-black text-[#22abe2]">{c.grade ? `${c.grade}/100` : '95/100'}</td>
+                    <td className="py-3 px-4 text-slate-600">No disponible</td>
+                    <td className="py-3 px-4 font-black text-[#22abe2]">{c.grade ? `${c.grade}/100` : 'Sin calificación'}</td>
                     <td className="py-3 px-4">
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                         c.progress >= 70 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-sky-50 text-sky-700 border border-sky-200'
                       }`}>
-                        {c.progress >= 70 ? 'Aprobada' : 'En Curso'}
+                        {'Inscrito'}
                       </span>
                     </td>
                   </tr>
@@ -436,7 +512,7 @@ export const MiIinicia: React.FC = () => {
             <h4 className="font-bold text-slate-900 text-sm">Constancia de Estudios Oficial</h4>
             <p className="text-xs text-slate-500">Documento membretado con código QR para trámites de visa, empleo o beca.</p>
             <button
-              onClick={() => alert('Constancia generada exitosamente en formato digital.')}
+              onClick={() => alert('La emisión de constancias todavía no está habilitada.')}
               className="w-full py-2 rounded-xl bg-[#22abe2]/10 text-[#22abe2] text-xs font-bold hover:bg-[#22abe2]/20 transition"
             >
               Solicitar Constancia
@@ -460,7 +536,7 @@ export const MiIinicia: React.FC = () => {
             <h4 className="font-bold text-slate-900 text-sm">Finanzas y Colegiaturas</h4>
             <p className="text-xs text-slate-500">Consulta de recibos fiscales CFDI, facturación en línea y pagos automatizados.</p>
             <button
-              onClick={() => alert('Tu colegiatura se encuentra al corriente para este semestre.')}
+              onClick={() => alert('La consulta financiera todavía no está habilitada.')}
               className="w-full py-2 rounded-xl bg-[#22abe2]/10 text-[#22abe2] text-xs font-bold hover:bg-[#22abe2]/20 transition"
             >
               Ver Finanzas Escolares
