@@ -85,8 +85,44 @@ fun CourseDetailScreen(
     }
 
 
-    LaunchedEffect(courseId) {
+    var mostrarGestionDocente by remember(courseId) {
+        mutableStateOf(false)
+    }
+
+    var puedeGestionarCurso by remember(courseId) {
+        mutableStateOf(false)
+    }
+
+    var recargarCurso by remember(courseId) {
+        mutableStateOf(0)
+    }
+
+    LaunchedEffect(courseId, recargarCurso) {
+        puedeGestionarCurso = false
+
         viewModel.selectCourse(courseId)
+
+        repository.consultarGestion(
+            "api/auth/courses/$courseId/contents"
+        ).onSuccess { respuesta ->
+            val permisos = respuesta.getAsJsonObject("permisos")
+
+            puedeGestionarCurso =
+                permisos?.get("puedeCrear")?.asBoolean == true ||
+                permisos?.get("puedeCambiarVisibilidad")?.asBoolean == true
+        }
+    }
+
+    if (mostrarGestionDocente && puedeGestionarCurso) {
+        courseId.toLongOrNull()?.let { id ->
+            TeacherCourseManagement(
+                courseId = id,
+                onClose = {
+                    mostrarGestionDocente = false
+                    recargarCurso++
+                }
+            )
+        }
     }
 
     Scaffold(
@@ -152,6 +188,30 @@ fun CourseDetailScreen(
                                 text = "Periodo: ${currentCourse.semester}",
                                 fontSize = 13.sp,
                                 color = TextMuted
+                            )
+                        }
+                    }
+                }
+
+                if (puedeGestionarCurso) {
+                    item {
+                        Button(
+                            onClick = {
+                                mostrarGestionDocente = true
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(52.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = BrightBlue
+                            )
+                        ) {
+                            Text(
+                                text = "Gestionar asignaciones",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp
                             )
                         }
                     }
