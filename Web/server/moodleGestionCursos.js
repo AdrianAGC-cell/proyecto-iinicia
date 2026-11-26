@@ -1,3 +1,4 @@
+import { activarEstudiante } from './activacionEstudiante.js';
 import { exigirRoles } from './moodleRoles.js';
 
 const academicos = [
@@ -425,39 +426,71 @@ export function configurarGestionCursos(app) {
                     });
                 }
 
-                await moodle(
-                    req,
-                    'enrol_manual_enrol_users',
-                    {
-                        'enrolments[0][roleid]': 5,
-                        'enrolments[0][userid]': usuarioId,
-                        'enrolments[0][courseid]': cursoId
-                    }
-                );
+                async function verificar() {
+                    const v = await moodle(
+                        req,
+                        'local_iinicia_enrolment_status',
+                        {
+                            courseid: cursoId,
+                            userid: usuarioId
+                        }
+                    );
 
-                const verificacion = await moodle(
-                    req,
-                    'local_iinicia_enrolment_status',
-                    {
-                        courseid: cursoId,
-                        userid: usuarioId
+                    if (
+                        Number(v.courseid) !== cursoId ||
+                        Number(v.userid) !== usuarioId
+                    ) {
+                        throw new Error('Verificacion incompatible');
                     }
-                );
 
-                const matriculado =
-                    Number(verificacion.courseid) === cursoId &&
-                    Number(verificacion.userid) === usuarioId &&
-                    verificacion.enrolled === true &&
-                    verificacion.student === true;
+                    return v.enrolled === true &&
+                        v.student === true;
+                }
+
+                let matriculado = await verificar();
+
+                if (!matriculado) {
+                    await moodle(
+                        req,
+                        'enrol_manual_enrol_users',
+                        {
+                            'enrolments[0][roleid]': 5,
+                            'enrolments[0][userid]': usuarioId,
+                            'enrolments[0][courseid]': cursoId
+                        }
+                    );
+
+                    matriculado = await verificar();
+                }
 
                 if (!matriculado) {
                     throw new Error('Matricula no confirmada');
                 }
 
+                let activacion;
+
+                try {
+                    activacion = await activarEstudiante(usuarioId);
+                } catch (error) {
+                    console.error(
+                        '[IINICIA Activacion]',
+                        error.message
+                    );
+
+                    return res.status(409).json({
+                        success: false,
+                        matriculado: true,
+                        activado: false,
+                        error: 'Matricula confirmada en Moodle. Activacion institucional pendiente; puedes reintentar.'
+                    });
+                }
+
                 return res.json({
                     success: true,
                     cursoId,
-                    usuarioId
+                    usuarioId,
+                    matriculado: true,
+                    ...activacion
                 });
 
             } catch (error) {
