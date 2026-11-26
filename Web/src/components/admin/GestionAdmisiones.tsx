@@ -13,6 +13,7 @@ interface Solicitud {
   average_grade: number;
   status: string;
   moodle_synced: boolean;
+  iinicia_sync_state: string;
   created_at: string;
 }
 
@@ -192,7 +193,19 @@ export const GestionAdmisiones: React.FC = () => {
                   Admisión autorizada. Vinculación con Moodle pendiente.
                 </p>
 
-                {puedeVincular && (
+                {s.iinicia_sync_state === 'PROCESSING' && (
+                  <p className="text-sm text-sky-700">
+                    Vinculación en procesamiento.
+                  </p>
+                )}
+
+                {s.iinicia_sync_state === 'FAILED' && (
+                  <p className="bg-red-50 text-red-700 rounded-xl p-3 text-sm">
+                    Vinculación incompleta. Requiere revisión administrativa.
+                  </p>
+                )}
+
+                {puedeVincular && s.iinicia_sync_state === 'PENDING' && (
                   <button
                     disabled={ocupado}
                     onClick={() => solicitarConfirmacion(s, 'VINCULAR')}

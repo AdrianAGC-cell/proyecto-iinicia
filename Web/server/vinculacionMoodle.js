@@ -12,7 +12,46 @@ export async function vincularAspirante(db, folio, token) {
     vinculacionesActivas.add(folio);
 
     try {
-        return await ejecutarVinculacion(db, folio, token);
+        const { data: reserva, error: errorReserva } = await db
+            .from('admission_applications')
+            .update({
+                iinicia_sync_state: 'PROCESSING',
+                iinicia_sync_started_at: new Date().toISOString(),
+                iinicia_sync_error: null
+            })
+            .eq('id', folio)
+            .eq('status', 'ADMITIDO')
+            .eq('moodle_synced', false)
+            .eq('iinicia_sync_state', 'PENDING')
+            .not('iinicia_auth_owner', 'is', null)
+            .select('id')
+            .maybeSingle();
+
+        if (errorReserva || !reserva) {
+            throw new Error(
+                'Solicitud no disponible o vinculacion pendiente de revision'
+            );
+        }
+
+        try {
+            return await ejecutarVinculacion(db, folio, token);
+        } catch (error) {
+            const { error: errorRegistro } = await db
+                .from('admission_applications')
+                .update({
+                    iinicia_sync_state: 'FAILED',
+                    iinicia_sync_error: 'Requiere revision administrativa'
+                })
+                .eq('id', folio)
+                .eq('iinicia_sync_state', 'PROCESSING')
+                .eq('moodle_synced', false);
+
+            if (errorRegistro) {
+                console.error('No se pudo registrar el fallo de vinculacion');
+            }
+
+            throw error;
+        }
     } finally {
         vinculacionesActivas.delete(folio);
     }
@@ -219,6 +258,8 @@ async function ejecutarVinculacion(db, folio, token) {
             user_id: nuevo.id,
             moodle_user_id: moodleId,
             moodle_synced: true,
+            iinicia_sync_state: 'SYNCED',
+            iinicia_sync_error: null,
             moodle_sync_date: new Date().toISOString(),
             updated_at: new Date().toISOString()
         })

@@ -17,7 +17,7 @@ export function configurarAdmisiones(app) {
 
     const tabla = 'admission_applications';
     const base = '/api/auth/admisiones';
-    const campos = 'id,full_name,email,phone,program_id,program_name,previous_school,average_grade,status,moodle_synced,created_at';
+    const campos = 'id,full_name,email,phone,program_id,program_name,previous_school,average_grade,status,moodle_synced,iinicia_sync_state,created_at';
 
     const academico = exigirRoles(
         'superadmin',
