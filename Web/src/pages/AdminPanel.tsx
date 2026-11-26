@@ -1,3 +1,4 @@
+import { GestionSoporte } from '../components/admin/GestionSoporte';
 import { GestionCohortes } from '../components/admin/GestionCohortes';
 import { GestionCursos } from '../components/admin/GestionCursos';
 import React, { useEffect, useState } from 'react';
@@ -213,16 +214,11 @@ export const AdminPanel: React.FC = () => {
         </section>
       )}
 
-      {rol === 'soporte' && (
-        <section className="bg-white border rounded-2xl p-6">
-          <Headphones className="text-sky-600 mb-3" />
-          <h2 className="font-bold">Soporte técnico</h2>
-          <p className="text-sm text-slate-500 mt-2">
-            Diagnóstico de conexión disponible.
-            Gestión de incidencias pendiente.
-          </p>
-        </section>
+      {(rol === 'soporte' || rol === 'superadmin') && (
+        <GestionSoporte administrar />
       )}
+
+      <GestionSoporte />
 
     </main>
   );
